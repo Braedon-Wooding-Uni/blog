@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="Hugo 0.15" />
+
+
+<title>Lambda crabs (part 1): A mathematical introduction to lifetimes and regions - Ticki</title>
+<meta property="og:title" content="Lambda crabs (part 1): A mathematical introduction to lifetimes and regions - Ticki">
+
+
+
+  
+
+
+
+
+
+
+<link rel="stylesheet" href="/css/main.css" media="all">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=Merriweather:400|Lato:400,400italic,700">
+
+  </head>
+  <body>
+    <div class="wrapper">
+      <header class="header">
+        <nav class="nav">
+  <a href="/" class="nav-logo"><img src="/images/logo.png" width="50" height="50"></a>
+
+  <ul class="nav-links">
+    
+    <li><a href="/about/">About</a></li>
+    
+    <li><a href="https://github.com/ticki">GitHub</a></li>
+    
+  </ul>
+</nav>
+
+      </header>
+
+
+<main class="content" role="main">
+
+  <article class="article">
+    
+
+    <h1 class="article-title">Lambda crabs (part 1): A mathematical introduction to lifetimes and regions</h1>
+
+    
+
+    <div class="article-content">
+      
+
+<p>This post will cover lifetimes and regions in depth, with a focus on the mathematical background of regions. That is, what is a region? What rules do they follow? How does the compiler handle them? And how are they inferred?</p>
+
+<h2 id="regions-and-their-ordering:a1cc048e046558d378d2e7f432f3236a">Regions and their ordering</h2>
+
+<p>So, let&rsquo;s briefly investigate what a region is. A region (or in Rust lingo, a lifetime) is a span of some form, e.g. the token stream. Regions have an outlive relation defined on them.</p>
+
+<p>A region <code>'a</code> outlives <code>'b</code> if <code>'b</code>&rsquo;s span is covered by <code>'a</code>. For example:</p>
+
+<pre><code>'a: I---------I
+'b: I----------------I
+</code></pre>
+
+<p>As you can see <code>'a: 'b</code> since the second span covers the first. But what is the nature of the outlives relation?</p>
+
+<h2 id="regions-a-poset:a1cc048e046558d378d2e7f432f3236a">Regions: a poset</h2>
+
+<p>One could mistakenly believe that regions are ordered over their outlives relation. An totally ordered set A under ≤ means that any elements a, b ∈ A satisfy all of the following statements:</p>
+
+<ol>
+<li><p>If a ≤ b and b ≤ a are both satisfied, a = b.</p></li>
+
+<li><p>If a ≤ b and b ≤ c are both satisfied, a ≤ c.</p></li>
+
+<li><p>At least one of a ≤ b and b ≤ a is true.</p></li>
+</ol>
+
+<p>To see why the outlives relation is not a total order over the set of regions, consider the case:</p>
+
+<pre><code>'a: I---------I
+'b:    I------------I
+</code></pre>
+
+<p>The third condition is not met here: neither <code>'a: 'b</code> or <code>'b: 'a</code> is true.</p>
+
+<p>It turns out that weakening the last condition to only consider reflexivity gives us a structure, that L (the set of regions) classifies. Replace 3. by a ≤ a, and you get a partially ordered set, or a poset.</p>
+
+<h2 id="outlive-relation-as-a-partial-order:a1cc048e046558d378d2e7f432f3236a">Outlive relation as a partial order</h2>
+
+<p>So, let&rsquo;s briefly explain how the rules of outliving mirrors the rules of partial orders.</p>
+
+<p>The first rule, the rule of antisymmetry, reads</p>
+
+<pre><code>'a: 'b
+'b: 'a
+-------
+'a = 'b
+</code></pre>
+
+<p>So if two regions (lifetimes, borrows, scopes, etc.) outlives each other symmetrically (&lsquo;a: &lsquo;b and &lsquo;b: &lsquo;a), they are, in fact, the same.</p>
+
+<p>The second rule, the rule of transitivity, is crucial to understanding the semantics of regions:</p>
+
+<pre><code>'a: 'b
+'b: 'c
+------
+'a: 'c
+</code></pre>
+
+<p>In other words, regions are hierarchal. It might seem very simple, but the implications are in fact very important: it allows us to conclude things from transitivity. Think of it like you can &ldquo;inherit&rdquo; bounds from outliving regions.</p>
+
+<p>For example,</p>
+
+<pre><code>'a:      I---------I
+'b:   I----------------I
+'c: I--------------------I
+</code></pre>
+
+<p>Say we know that, <code>'a: 'b</code>, and <code>'b: 'c</code>. We can then conclude that <code>'a: 'c</code>.</p>
+
+<p>The last rule simply states that &lsquo;a outlives itself. This might seem counterintuitive due to the odd terminology, but think of outlives as &ldquo;outlives or equals to&rdquo;.</p>
+
+<p>In fact, there is only one more thing we know about regions: they have an unique maximal extrema, which outlives all other regions, <code>'static</code>. Namely, <code>'static</code> outlives any region, <code>'a</code>.</p>
+
+<p>And that&rsquo;s all the &ldquo;axioms&rdquo; of lifetimes.</p>
+
+<h2 id="what-subtyping-is:a1cc048e046558d378d2e7f432f3236a">What subtyping is</h2>
+
+<p>Before we go to next section, we will just have to briefly cover subtyping. τ is said to be a subtype of υ (denoted <code>τ &lt;: υ</code>), if a <em>type mismatch</em>, such that τ is inferred to be of type υ, makes the value of type τ coerce into a value of type υ.</p>
+
+<p>In other words, you can replace your subtype by a supertype (the parent type) without getting a type mismatch error.</p>
+
+<h2 id="regions-are-just-types-outlive-relation-as-a-subtyping-rule:a1cc048e046558d378d2e7f432f3236a">Regions are just types: Outlive relation as a subtyping rule</h2>
+
+<p>If you think about it, you may notice that lifetimes are used in type positions <em>a lot</em>. This is no coincidence, since <em>regions are just types with a subtyping relation</em>, which is the very reason you are allowed to do e.g. <code>MyStruct&lt;'a&gt;</code>.</p>
+
+<p>In fact, the outlive relation defines a subtyping rule. That is, you can always &ldquo;shrink&rdquo; a region span. Let <em>c</em> be a type constructor, &lsquo;a → *, then &lsquo;a: &lsquo;b implies that <code>'a &lt;: 'b</code>, that is <code>'a</code> can coerce into <code>'b</code>.</p>
+
+<p>For example, <code>&amp;'static str</code> can coerce to any <code>&amp;'a str</code>, since <code>'static</code> outlives any lifetime.</p>
+
+<p>Due to the implementation, there are a few limits, though. You can for example not do <code>let a: 'a</code> which would be useless anyways.</p>
+
+<p>Syntactically, there is a confusion: lifetimes appears in certain trait places, especially in <em>trait bounds</em>. But, in fact, that is only a syntactic sugar for an imaginary trait, let&rsquo;s call it <code>Scope</code>, which takes a lifetime.</p>
+
+<p>This represents the scope of a type, so when writing <code>fn my_func::&lt;T: 'static&gt;()</code> you can think of it as writing <code>fn my_func::&lt;T: Scope&lt;'static&gt;&gt;</code>.</p>
+
+<p>Due to the coercion rules (which will be covered in a future post), this means that if <code>T: Scope&lt;'a&gt;</code> and <code>U: Scope&lt;'b&gt;</code> with <code>'a: 'b</code>, then <code>T</code> is a subtype of <code>U</code>.</p>
+
+<h2 id="inferring-regions:a1cc048e046558d378d2e7f432f3236a">Inferring regions.</h2>
+
+<p>This is the exciting part. Rust has region inference, allowing it to infer the lifetimes in your program.</p>
+
+<p>Due to Rust&rsquo;s aliasing guarantees, it tries to <em>minimize</em> the region&rsquo;s span, while still satisfying the conditions (outlives relations) given.</p>
+
+<p>So, this is just a classical optimization problem:</p>
+
+<pre><code>minimize    'a
+subject to  A, B, C...
+</code></pre>
+
+<p>A, B, C&hellip; are outlives relations. &lsquo;a may or may not be free in those.</p>
+
+<p>We will cover how we actually solve this optimization problem in a future blog post, but until then you can see if you can find an algorithm to do so ;).</p>
+
+<h2 id="questions-and-errata:a1cc048e046558d378d2e7f432f3236a">Questions and errata</h2>
+
+<p>Ping me at #rust in Mozilla IRC.</p>
+
+<h2 id="credits:a1cc048e046558d378d2e7f432f3236a">Credits</h2>
+
+<p>Credits to Yaniel on IRC for the idea for the name of this series. It is based on the famous &ldquo;lambda cats&rdquo; series, but since Ferris, the crab, is our Rust mascot, we do lambda crabs, instead.</p>
+
+    </div>
+  </article>
+
+  
+
+</main>
+
+      <footer class="footer">
+        <ul class="footer-links">
+          <li>
+            <a href="/index.xml" type="application/rss+xml" target="_blank">RSS feed</a>
+          </li>
+          <li>
+            <a href="https://gohugo.io/" class="footer-links-kudos">Made with <img src="/images/hugo-logo.png" width="22" height="22"></a>
+          </li>
+        </ul>
+      </footer>
+
+    </div>
+
+    
+  </body>
+</html>
+

@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Ticki</title>
+    <link>/</link>
+    <description>Recent content on Ticki</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Mon, 06 Jun 2016 09:12:56 +0200</lastBuildDate>
+    <atom:link href="/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Lambda crabs (part 1): A mathematical introduction to lifetimes and regions</title>
+      <link>/blog/lambda_crabs_1/</link>
+      <pubDate>Mon, 06 Jun 2016 09:12:56 +0200</pubDate>
+      
+      <guid>/blog/lambda_crabs_1/</guid>
+      <description>
+
+&lt;p&gt;This post will cover lifetimes and regions in depth, with a focus on the mathematical background of regions. That is, what is a region? What rules do they follow? How does the compiler handle them? And how are they inferred?&lt;/p&gt;
+
+&lt;h2 id=&#34;regions-and-their-ordering:a1cc048e046558d378d2e7f432f3236a&#34;&gt;Regions and their ordering&lt;/h2&gt;
+
+&lt;p&gt;So, let&amp;rsquo;s briefly investigate what a region is. A region (or in Rust lingo, a lifetime) is a span of some form, e.g. the token stream. Regions have an outlive relation defined on them.&lt;/p&gt;
+
+&lt;p&gt;A region &lt;code&gt;&#39;a&lt;/code&gt; outlives &lt;code&gt;&#39;b&lt;/code&gt; if &lt;code&gt;&#39;b&lt;/code&gt;&amp;rsquo;s span is covered by &lt;code&gt;&#39;a&lt;/code&gt;. For example:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&#39;a: I---------I
+&#39;b: I----------------I
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;As you can see &lt;code&gt;&#39;a: &#39;b&lt;/code&gt; since the second span covers the first. But what is the nature of the outlives relation?&lt;/p&gt;
+
+&lt;h2 id=&#34;regions-a-poset:a1cc048e046558d378d2e7f432f3236a&#34;&gt;Regions: a poset&lt;/h2&gt;
+
+&lt;p&gt;One could mistakenly believe that regions are ordered over their outlives relation. An totally ordered set A under ≤ means that any elements a, b ∈ A satisfy all of the following statements:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;If a ≤ b and b ≤ a are both satisfied, a = b.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;If a ≤ b and b ≤ c are both satisfied, a ≤ c.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;At least one of a ≤ b and b ≤ a is true.&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;To see why the outlives relation is not a total order over the set of regions, consider the case:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&#39;a: I---------I
+&#39;b:    I------------I
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The third condition is not met here: neither &lt;code&gt;&#39;a: &#39;b&lt;/code&gt; or &lt;code&gt;&#39;b: &#39;a&lt;/code&gt; is true.&lt;/p&gt;
+
+&lt;p&gt;It turns out that weakening the last condition to only consider reflexivity gives us a structure, that L (the set of regions) classifies. Replace 3. by a ≤ a, and you get a partially ordered set, or a poset.&lt;/p&gt;
+
+&lt;h2 id=&#34;outlive-relation-as-a-partial-order:a1cc048e046558d378d2e7f432f3236a&#34;&gt;Outlive relation as a partial order&lt;/h2&gt;
+
+&lt;p&gt;So, let&amp;rsquo;s briefly explain how the rules of outliving mirrors the rules of partial orders.&lt;/p&gt;
+
+&lt;p&gt;The first rule, the rule of antisymmetry, reads&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&#39;a: &#39;b
+&#39;b: &#39;a
+-------
+&#39;a = &#39;b
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So if two regions (lifetimes, borrows, scopes, etc.) outlives each other symmetrically (&amp;lsquo;a: &amp;lsquo;b and &amp;lsquo;b: &amp;lsquo;a), they are, in fact, the same.&lt;/p&gt;
+
+&lt;p&gt;The second rule, the rule of transitivity, is crucial to understanding the semantics of regions:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&#39;a: &#39;b
+&#39;b: &#39;c
+------
+&#39;a: &#39;c
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;In other words, regions are hierarchal. It might seem very simple, but the implications are in fact very important: it allows us to conclude things from transitivity. Think of it like you can &amp;ldquo;inherit&amp;rdquo; bounds from outliving regions.&lt;/p&gt;
+
+&lt;p&gt;For example,&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&#39;a:      I---------I
+&#39;b:   I----------------I
+&#39;c: I--------------------I
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Say we know that, &lt;code&gt;&#39;a: &#39;b&lt;/code&gt;, and &lt;code&gt;&#39;b: &#39;c&lt;/code&gt;. We can then conclude that &lt;code&gt;&#39;a: &#39;c&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;The last rule simply states that &amp;lsquo;a outlives itself. This might seem counterintuitive due to the odd terminology, but think of outlives as &amp;ldquo;outlives or equals to&amp;rdquo;.&lt;/p&gt;
+
+&lt;p&gt;In fact, there is only one more thing we know about regions: they have an unique maximal extrema, which outlives all other regions, &lt;code&gt;&#39;static&lt;/code&gt;. Namely, &lt;code&gt;&#39;static&lt;/code&gt; outlives any region, &lt;code&gt;&#39;a&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;And that&amp;rsquo;s all the &amp;ldquo;axioms&amp;rdquo; of lifetimes.&lt;/p&gt;
+
+&lt;h2 id=&#34;what-subtyping-is:a1cc048e046558d378d2e7f432f3236a&#34;&gt;What subtyping is&lt;/h2&gt;
+
+&lt;p&gt;Before we go to next section, we will just have to briefly cover subtyping. τ is said to be a subtype of υ (denoted &lt;code&gt;τ &amp;lt;: υ&lt;/code&gt;), if a &lt;em&gt;type mismatch&lt;/em&gt;, such that τ is inferred to be of type υ, makes the value of type τ coerce into a value of type υ.&lt;/p&gt;
+
+&lt;p&gt;In other words, you can replace your subtype by a supertype (the parent type) without getting a type mismatch error.&lt;/p&gt;
+
+&lt;h2 id=&#34;regions-are-just-types-outlive-relation-as-a-subtyping-rule:a1cc048e046558d378d2e7f432f3236a&#34;&gt;Regions are just types: Outlive relation as a subtyping rule&lt;/h2&gt;
+
+&lt;p&gt;If you think about it, you may notice that lifetimes are used in type positions &lt;em&gt;a lot&lt;/em&gt;. This is no coincidence, since &lt;em&gt;regions are just types with a subtyping relation&lt;/em&gt;, which is the very reason you are allowed to do e.g. &lt;code&gt;MyStruct&amp;lt;&#39;a&amp;gt;&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;In fact, the outlive relation defines a subtyping rule. That is, you can always &amp;ldquo;shrink&amp;rdquo; a region span. Let &lt;em&gt;c&lt;/em&gt; be a type constructor, &amp;lsquo;a → *, then &amp;lsquo;a: &amp;lsquo;b implies that &lt;code&gt;&#39;a &amp;lt;: &#39;b&lt;/code&gt;, that is &lt;code&gt;&#39;a&lt;/code&gt; can coerce into &lt;code&gt;&#39;b&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;For example, &lt;code&gt;&amp;amp;&#39;static str&lt;/code&gt; can coerce to any &lt;code&gt;&amp;amp;&#39;a str&lt;/code&gt;, since &lt;code&gt;&#39;static&lt;/code&gt; outlives any lifetime.&lt;/p&gt;
+
+&lt;p&gt;Due to the implementation, there are a few limits, though. You can for example not do &lt;code&gt;let a: &#39;a&lt;/code&gt; which would be useless anyways.&lt;/p&gt;
+
+&lt;p&gt;Syntactically, there is a confusion: lifetimes appears in certain trait places, especially in &lt;em&gt;trait bounds&lt;/em&gt;. But, in fact, that is only a syntactic sugar for an imaginary trait, let&amp;rsquo;s call it &lt;code&gt;Scope&lt;/code&gt;, which takes a lifetime.&lt;/p&gt;
+
+&lt;p&gt;This represents the scope of a type, so when writing &lt;code&gt;fn my_func::&amp;lt;T: &#39;static&amp;gt;()&lt;/code&gt; you can think of it as writing &lt;code&gt;fn my_func::&amp;lt;T: Scope&amp;lt;&#39;static&amp;gt;&amp;gt;&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Due to the coercion rules (which will be covered in a future post), this means that if &lt;code&gt;T: Scope&amp;lt;&#39;a&amp;gt;&lt;/code&gt; and &lt;code&gt;U: Scope&amp;lt;&#39;b&amp;gt;&lt;/code&gt; with &lt;code&gt;&#39;a: &#39;b&lt;/code&gt;, then &lt;code&gt;T&lt;/code&gt; is a subtype of &lt;code&gt;U&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2 id=&#34;inferring-regions:a1cc048e046558d378d2e7f432f3236a&#34;&gt;Inferring regions.&lt;/h2&gt;
+
+&lt;p&gt;This is the exciting part. Rust has region inference, allowing it to infer the lifetimes in your program.&lt;/p&gt;
+
+&lt;p&gt;Due to Rust&amp;rsquo;s aliasing guarantees, it tries to &lt;em&gt;minimize&lt;/em&gt; the region&amp;rsquo;s span, while still satisfying the conditions (outlives relations) given.&lt;/p&gt;
+
+&lt;p&gt;So, this is just a classical optimization problem:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;minimize    &#39;a
+subject to  A, B, C...
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;A, B, C&amp;hellip; are outlives relations. &amp;lsquo;a may or may not be free in those.&lt;/p&gt;
+
+&lt;p&gt;We will cover how we actually solve this optimization problem in a future blog post, but until then you can see if you can find an algorithm to do so ;).&lt;/p&gt;
+
+&lt;h2 id=&#34;questions-and-errata:a1cc048e046558d378d2e7f432f3236a&#34;&gt;Questions and errata&lt;/h2&gt;
+
+&lt;p&gt;Ping me at #rust in Mozilla IRC.&lt;/p&gt;
+
+&lt;h2 id=&#34;credits:a1cc048e046558d378d2e7f432f3236a&#34;&gt;Credits&lt;/h2&gt;
+
+&lt;p&gt;Credits to Yaniel on IRC for the idea for the name of this series. It is based on the famous &amp;ldquo;lambda cats&amp;rdquo; series, but since Ferris, the crab, is our Rust mascot, we do lambda crabs, instead.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>
