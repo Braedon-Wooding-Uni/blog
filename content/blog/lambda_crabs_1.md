@@ -17,7 +17,7 @@ A region `'a` outlives `'b` if `'b`'s span is covered by `'a`. For example:
 'b: I---------I
 ```
 
-As you can see `'b: 'a` since the second span covers the first. But what is the nature of the outlives relation?
+As you can see `'a: 'b` since the first span covers the second. But what is the nature of the outlives relation?
 
 ## Regions: a poset
 
@@ -64,7 +64,7 @@ The second rule, the rule of transitivity, is crucial to understanding the seman
 'a: 'c
 ```
 
-In other words, regions are hierarchal. It might seem very simple, but the implications are in fact very important: it allows us to conclude things from transitivity. Think of it like you can "inherit" bounds from outliving regions.
+In other words, regions are hierarchical. It might seem very simple, but the implications are in fact very important: it allows us to conclude things from transitivity. Think of it like you can "inherit" bounds from outliving regions.
 
 For example,
 
@@ -117,7 +117,7 @@ minimize    'a
 subject to  A, B, C...
 ```
 
-A, B, C... are outlives relations. 'a may or may not be free in those.
+A, B, C... are outlives relations. `'a` may or may not be free in those.
 
 We will cover how we actually solve this optimization problem in a future blog post, but until then you can see if you can find an algorithm to do so ;).
 
