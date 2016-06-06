@@ -13,11 +13,11 @@ So, let's briefly investigate what a region is. A region (or in Rust lingo, a li
 A region `'a` outlives `'b` if `'b`'s span is covered by `'a`. For example:
 
 ```
-'a: I---------I
-'b: I----------------I
+'a: I----------------I
+'b: I---------I
 ```
 
-As you can see `'a: 'b` since the second span covers the first. But what is the nature of the outlives relation?
+As you can see `'b: 'a` since the second span covers the first. But what is the nature of the outlives relation?
 
 ## Regions: a poset
 
@@ -69,9 +69,9 @@ In other words, regions are hierarchal. It might seem very simple, but the impli
 For example,
 
 ```
-'a:      I---------I
+'a: I--------------------I
 'b:   I----------------I
-'c: I--------------------I
+'c:      I---------I
 ```
 
 Say we know that, `'a: 'b`, and `'b: 'c`. We can then conclude that `'a: 'c`.
