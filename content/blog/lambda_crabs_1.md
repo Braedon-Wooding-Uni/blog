@@ -1,7 +1,8 @@
 +++
 date = "2016-06-06T09:12:56+02:00"
 title = "Lambda crabs (part 1): A mathematical introduction to lifetimes and regions"
-
+description = "In this post, I go through the theoretical foundation of region-based memory management."
+tags = ["lambda-crabs", "rust", "mathematics", "regions", "lifetimes"]
 +++
 
 This post will cover lifetimes and regions in depth, with a focus on the mathematical background of regions. That is, what is a region? What rules do they follow? How does the compiler handle them? And how are they inferred?

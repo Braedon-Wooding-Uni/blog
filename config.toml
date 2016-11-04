@@ -1,11 +1,22 @@
 baseurl = "/"
-languageCode = "en-us"
+languagecode = "en-us"
 title = "Ticki"
-theme = "lithium"
+theme = "bleak"
+pygmentsuseclasses = true
+
+contentdir =                 "content"
+statictdir =                 "static"
+layoutsdir =                 "layouts"
+dataDir =                    "data"
+defaultExtension =           "html"
+defaultLayout =              "post"
+
+DisqusShortname = "http-ticki-github-io"
+disqus_identifier = "http-ticki-github-io"
 
 [permalinks]
-    post = "/:year/:month/:day/:title/"
-    page = "/:title/"
+    page = "blog/:filename/"
+    post = "blog/:filename/"
 
 [[menu.main]]
     name = "About"
@@ -13,11 +24,17 @@ theme = "lithium"
 [[menu.main]]
     name = "GitHub"
     url = "https://github.com/ticki"
+[[menu.rss]]
+    name = "/index.xml"
+    url = "https://github.com/ticki"
+
+[indexes]
+  tag = "tags"
+  topic = "topics"
 
 [params]
-    description = "I wish I were able to make up a catchy blog line here."
-
-    [params.logo]
-    url = "logo.png"
-    width = 50
-    height = 50
+    disqus = "http-ticki-github-io"
+    description = "Howdy, this is my blog!"
+    logo = "/logo.png"
+    hideHUGOSupport = false
+    githubName = "ticki"
