@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Type Systems on Ticki&#39;s blog</title>
+    <link>http://ticki.github.io/tags/type-systems/</link>
+    <description>Recent content in Type Systems on Ticki&#39;s blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Mon, 06 Jun 2016 11:06:21 +0200</lastBuildDate>
+    <atom:link href="http://ticki.github.io/tags/type-systems/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Lambda crabs (part 2): Region inference is (not) magic.</title>
+      <link>http://ticki.github.io/blog/lambda_crabs_2/</link>
+      <pubDate>Mon, 06 Jun 2016 11:06:21 +0200</pubDate>
+      
+      <guid>http://ticki.github.io/blog/lambda_crabs_2/</guid>
+      <description>
+
+&lt;p&gt;This post will cover region (lifetime) inference with a mathematical and type
+theoretical focus.&lt;/p&gt;
+
+&lt;h2 id=&#34;the-problem&#34;&gt;The problem&lt;/h2&gt;
+
+&lt;p&gt;Inference is a very handy concept. We no longer have to annotate redundant
+types, which is a major pain point in languages, that lacks of type inference.&lt;/p&gt;
+
+&lt;p&gt;Now, we want such an inference scheme for regions as well.&lt;/p&gt;
+
+&lt;p&gt;We described the problem of region inference in &lt;a href=&#34;http://ticki.github.io/blog/lambda_crabs_1/&#34;&gt;last post&lt;/a&gt; as:&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;So, this is just a classical optimization problem:&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;pre&gt;&lt;code&gt;  minimize    &#39;a
+  subject to  A, B, C...
+
+  A, B, C… are outlives relations. ‘a may or may not be free in those.
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Namely, we want to minimize some lifetimes, while holding some conditions.&lt;/p&gt;
+
+&lt;h2 id=&#34;adding-regions&#34;&gt;&amp;ldquo;Adding&amp;rdquo; regions&lt;/h2&gt;
+
+&lt;p&gt;One thing we will use throughout the region inference algorithm is the notion of &amp;ldquo;adding&amp;rdquo; regions.&lt;/p&gt;
+
+&lt;p&gt;You may have seen &lt;code&gt;&#39;a + &#39;b&lt;/code&gt; before. Intuitively, &lt;code&gt;&#39;a: &#39;b + &#39;c&lt;/code&gt; is equivalent to
+&lt;code&gt;&#39;a: &#39;b, &#39;a: &#39;c&lt;/code&gt;, but we can go further and use &lt;code&gt;&#39;a + &#39;b&lt;/code&gt; as a way to construct
+new regions:&lt;/p&gt;
+
+&lt;p&gt;Define &lt;code&gt;&#39;a + &#39;b&lt;/code&gt; as the smallest region that outlives both &lt;code&gt;&#39;a&lt;/code&gt; and &lt;code&gt;&#39;b&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;In a sense, you &amp;ldquo;widen&amp;rdquo; the region until it covers both regions:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&#39;a:       I---------I
+&#39;b:            I------------I
+&#39;a + &#39;b:  I-----------------I
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;funky-but-useless-regions-under-addition-as-an-abelian-semigroup&#34;&gt;Funky but useless: Regions under addition as an abelian semigroup&lt;/h2&gt;
+
+&lt;p&gt;A semigroup is an algebraic structure satisfying two properties:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Closure, for any a, b in S, a + b is contained in S.&lt;/li&gt;
+&lt;li&gt;Associativity, for any a, b, and c in S, (a + b) + c = a + (b + c).&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;But in contrary to monoids, there is no identity element.&lt;/p&gt;
+
+&lt;p&gt;&amp;ldquo;Abelian&amp;rdquo; means commutative. That is, a + b = b + a.&lt;/p&gt;
+
+&lt;p&gt;And, in fact, regions follows all these rules, making it an abelian semigroup.&lt;/p&gt;
+
+&lt;p&gt;We know two additional facts about our operator:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;It follows from the fact &lt;code&gt;&#39;a: &#39;a&lt;/code&gt;, that a + a = a&lt;/li&gt;
+&lt;li&gt;It follows from the fact &lt;code&gt;&#39;static: &#39;a&lt;/code&gt; for all &lt;code&gt;&#39;a&lt;/code&gt;, that &lt;code&gt;∃s∈L  ∀a∈L  s + a = s&lt;/code&gt;.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;regions-as-a-lattice&#34;&gt;Regions as a lattice&lt;/h2&gt;
+
+&lt;p&gt;It makes much more sense to think of regions as a lattice. A lattice is a poset
+with two operators defined on it:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;Join, an unique supremum (that is, least upper-bound). This is our &lt;code&gt;+&lt;/code&gt;
+operator.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Meet, an unique infimum (that is, greatest lower-bound). This isn&amp;rsquo;t very
+useful for the matter of regions, but it is still defined on them.&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;which follows a set of laws:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;The law of commutativity: Both meet and join are commutative operators.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;The law of associativity: Both meet and join are associative operators.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;The law of absorption: Meet(a, Meet(a, b)) = Meet(a, b) and Join(a, Join(a, b)) = Join(a, b).&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;In fact, this describes our structure perfectly. In particular, L is an
+&lt;em&gt;upper-bounded lattice&lt;/em&gt;, i.e. we have a maximal element (&lt;code&gt;&#39;static&lt;/code&gt;).&lt;/p&gt;
+
+&lt;p&gt;Lattice theory, which we will cover in-depth in a later post is perfect for
+studying subtyping relations.&lt;/p&gt;
+
+&lt;h2 id=&#34;directed-acyclic-graphs&#34;&gt;Directed Acyclic Graphs&lt;/h2&gt;
+
+&lt;p&gt;A directed acyclic graph is a finite directed graph with no directed cycles.
+That is, any arbitrary directed walk in the graph will &amp;ldquo;end&amp;rdquo; at some point.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://upload.wikimedia.org/wikipedia/commons/6/61/Polytree.svg&#34; alt=&#34;&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s forget the &lt;code&gt;&#39;a: &#39;a&lt;/code&gt; case for a moment. As such, the regions under our
+&lt;em&gt;strict&lt;/em&gt; outlive relation, &lt;em&gt;&amp;lt;&lt;/em&gt;, forms a directed acyclic graph (DAG).&lt;/p&gt;
+
+&lt;p&gt;In particular, if two node are connected, with a directed edge A → B, A
+represents a region, which &lt;em&gt;outlives&lt;/em&gt; B.&lt;/p&gt;
+
+&lt;p&gt;Consider we take a reference &lt;code&gt;&amp;amp;&#39;b T&lt;/code&gt; where &lt;code&gt;T: &#39;a&lt;/code&gt;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt; &#39;static
+ |
+ v
+&#39;a &amp;lt;---------\
+ |           |
+ |           |
+ |           |
+ v           |
+&#39;b &amp;lt;------- &#39;a + &#39;b
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;handling-cycles&#34;&gt;Handling cycles&lt;/h2&gt;
+
+&lt;p&gt;Every lifetime outlives itself, as explained in the last post. So our outlives
+relation doesn&amp;rsquo;t form a DAG, due to these cycles.&lt;/p&gt;
+
+&lt;p&gt;The solution is relatively simple, though.&lt;/p&gt;
+
+&lt;p&gt;Let &lt;code&gt;{&#39;a, &#39;b, &#39;c, ...}&lt;/code&gt; be cycle such that &lt;code&gt;&#39;a &amp;lt; &#39;b &amp;lt; &#39;c ... &amp;lt; &#39;a&lt;/code&gt;. Due to
+transitivity and antisymmetry, we can assume that &lt;code&gt;&#39;a = &#39;b = &#39;c = ...&lt;/code&gt;, thus we
+can, without loss of generality, collapse the cycle into a single node.&lt;/p&gt;
+
+&lt;p&gt;This lets us interpret the graph, where edges represents outlives relations, as
+a DAG.&lt;/p&gt;
+
+&lt;h2 id=&#34;recursively-widening-the-regions&#34;&gt;Recursively widening the regions&lt;/h2&gt;
+
+&lt;p&gt;Say we want to infer the span of some node &lt;code&gt;&#39;a&lt;/code&gt;. Assume &lt;code&gt;&#39;a&lt;/code&gt; neighbors (outlives)
+&lt;code&gt;&#39;b, &#39;c, &#39;d...&lt;/code&gt;&lt;/p&gt;
+
+&lt;p&gt;Since we know the bound, we can say &lt;code&gt;&#39;a = &#39;b + &#39;c + &#39;d + ...&lt;/code&gt;, since this is the
+smallest &amp;lsquo;a subject to the outlives conditions.&lt;/p&gt;
+
+&lt;p&gt;Now, recursively do the same with &lt;code&gt;&#39;b, &#39;c, &#39;d, ...&lt;/code&gt; Since the graph is acyclic,
+this will terminate at some point.&lt;/p&gt;
+
+&lt;p&gt;On an implementation note: you can optimize this process by 1. deduplicating
+the regions, 2. collapsing sums containing &lt;code&gt;&#39;static&lt;/code&gt; into &lt;code&gt;&#39;static&lt;/code&gt;, 3. caching the
+nodes to avoid redundant calculations.&lt;/p&gt;
+
+&lt;h2 id=&#34;going-further-liveness&#34;&gt;Going further: liveness&lt;/h2&gt;
+
+&lt;p&gt;Now that we have a closed form for inferring lifetimes, we can do lots of cool stuff.&lt;/p&gt;
+
+&lt;p&gt;Liveness of a value is the span starting where the value is declared and ending
+where the last access to it is made. This is in contrary to the classical
+lexical approach, where the initial lifetimes are assigned as the scopes of the
+variables.&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s start by defining &lt;code&gt;empty(x)&lt;/code&gt; as the region spanning from x to x (that is,
+an empty region at x). Assign every value declared at x a region, &lt;code&gt;empty(x)&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Whenever a value of lifetime &lt;code&gt;&#39;x&lt;/code&gt; is used at some point y, we add a bound &lt;code&gt;&#39;x:
+empty(y)&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;So we essentially expand the region whenever used, effectively yielding the
+liveness of the value.&lt;/p&gt;
+
+&lt;h2 id=&#34;a-happy-ending&#34;&gt;A happy ending&lt;/h2&gt;
+
+&lt;p&gt;That&amp;rsquo;s it&amp;hellip; The algorithm is really that simple. In fact, you can implement it
+in only a 100-200 lines.&lt;/p&gt;
+
+&lt;h2 id=&#34;questions-and-errata&#34;&gt;Questions and errata&lt;/h2&gt;
+
+&lt;p&gt;Ping me at #rust in Mozilla IRC.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

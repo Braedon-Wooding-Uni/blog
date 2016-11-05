@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Skip Lists on Ticki&#39;s blog</title>
+    <link>http://ticki.github.io/tags/skip-lists/</link>
+    <description>Recent content in Skip Lists on Ticki&#39;s blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 17 Sep 2016 13:46:49 +0200</lastBuildDate>
+    <atom:link href="http://ticki.github.io/tags/skip-lists/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Skip Lists: Done Right</title>
+      <link>http://ticki.github.io/blog/skip-lists-done-right/</link>
+      <pubDate>Sat, 17 Sep 2016 13:46:49 +0200</pubDate>
+      
+      <guid>http://ticki.github.io/blog/skip-lists-done-right/</guid>
+      <description>
+
+&lt;p&gt;&lt;link rel=&#34;stylesheet&#34; href=&#34;https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.6.0/katex.min.css&#34;&gt;&lt;/p&gt;
+
+&lt;h1 id=&#34;what-is-a-skip-list&#34;&gt;What is a skip list?&lt;/h1&gt;
+
+&lt;p&gt;In short, skip lists are a linked-list-like structure which allows for fast search. It consists of a base list holding the elements, together with a tower of lists maintaining a linked hierarchy of subsequences, each skipping over fewer elements.&lt;/p&gt;
+
+&lt;p&gt;Skip list is a wonderful data structure, one of my personal favorites, but a trend in the past ten years has made them more and more uncommon as a single-threaded in-memory structure.&lt;/p&gt;
+
+&lt;p&gt;My take is that this is because of how hard they are to get right. The simplicity can easily fool you into being too relaxed with respect to performance, and while they are simple, it is important to pay attention to the details.&lt;/p&gt;
+
+&lt;p&gt;In the past five years, people have become increasingly sceptical of skip lists&amp;rsquo; performance, due to their poor cache behavior when compared to e.g. B-trees, but fear not, a good implementation of skip lists can easily outperform B-trees while being implementable in only a couple of hundred lines.&lt;/p&gt;
+
+&lt;p&gt;How? We will walk through a variety of techniques that can be used to achieve this speed-up.&lt;/p&gt;
+
+&lt;p&gt;These are my thoughts on how a bad and a good implementation of skip list looks like.&lt;/p&gt;
+
+&lt;h2 id=&#34;advantages&#34;&gt;Advantages&lt;/h2&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Skip lists perform very well on rapid insertions because there are no rotations or reallocations.&lt;/li&gt;
+&lt;li&gt;They&amp;rsquo;re simpler to implement than both self-balancing binary search trees and hash tables.&lt;/li&gt;
+&lt;li&gt;You can retrieve the next element in constant time (compare to logarithmic time for inorder traversal for BSTs and linear time in hash tables).&lt;/li&gt;
+&lt;li&gt;The algorithms can easily be modified to a more specialized structure (like segment or range &amp;ldquo;trees&amp;rdquo;, indexable skip lists, or keyed priority queues).&lt;/li&gt;
+&lt;li&gt;Making it lockless is simple.&lt;/li&gt;
+&lt;li&gt;It does well in persistent (slow) storage (often even better than AVL and EH).&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h1 id=&#34;a-naïve-but-common-implementation&#34;&gt;A naïve (but common) implementation&lt;/h1&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/nNjOtfa.png&#34; alt=&#34;Each shortcut has its own node.&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Our skip list consists of (in this case, three) lists, stacked such that the &lt;b style=&#34;font: 400 1.21em KaTeX_Math&#34;&gt;n&lt;/b&gt;&amp;lsquo;th list visits a subset of the node the &lt;b style=&#34;font: 400 1.21em KaTeX_Math&#34;&gt;n - 1&lt;/b&gt;&amp;lsquo;th list does. This subset is defined by a probability distribution, which we will get back to later.&lt;/p&gt;
+
+&lt;p&gt;If you rotate the skip list and remove duplicate edges, you can see how it resembles a binary search tree:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/DO031ek.png&#34; alt=&#34;A binary search tree.&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Say I wanted to look up the node &amp;ldquo;30&amp;rdquo;, then I&amp;rsquo;d perform normal binary search from the root and down. Due to duplicate nodes, we use the rule of going right if both children are equal:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/H5KjvqC.png&#34; alt=&#34;Searching the tree.&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Self-balancing Binary Search Trees often have complex algorithms to keep the tree balanced, but skip lists are easier: They aren&amp;rsquo;t trees, they&amp;rsquo;re similar to trees in some ways, but they are not trees.&lt;/p&gt;
+
+&lt;p&gt;Every node in the skip list is given a &amp;ldquo;height&amp;rdquo;, defined by the highest level containing the node (similarly, the number of decendants of a leaf containing the same value). As an example, in the above diagram, &amp;ldquo;42&amp;rdquo; has height 2, &amp;ldquo;25&amp;rdquo; has height 3, and &amp;ldquo;11&amp;rdquo; has height 1.&lt;/p&gt;
+
+&lt;p&gt;When we insert, we assign the node a height, following the probability distribution:&lt;/p&gt;
+
+&lt;p&gt;&lt;center style=&#34;font: 400 1.21em KaTeX_Math;font-style: italic;&#34;&gt; p(n) = 2&lt;sup&gt;1-n&lt;/sup&gt; &lt;/center&gt;&lt;/p&gt;
+
+&lt;p&gt;To obtain this distribution, we flip a coin until it hits tails, and count the flips:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;uint generate_level() {
+    uint n = 0;
+    while coin_flip() {
+        n++;
+    }
+
+    return n;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;By this distribution, statistically the parent layer would contain half as many nodes, so searching is amortized &lt;b style=&#34;font: 400 1.21em KaTeX_Main&#34;&gt;O(log &lt;i&gt;n&lt;/i&gt;) &lt;/b&gt;.&lt;/p&gt;
+
+&lt;p&gt;Note that we only have pointers to the right and below node, so insertion must be done while searching, that is, instead of searching and then inserting, we insert whenever we go a level down (pseudocode):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;-- Recursive skip list insertion function.
+define insert(elem, root, height, level):
+    if right of root &amp;lt; elem:
+        -- If right isn&#39;t &amp;quot;overshot&amp;quot; (i.e. we are going to long), we go right.
+        return insert(elem, right of root, height, level)
+    else:
+        if level = 0:
+            -- We&#39;re at bottom level and the right node is overshot, hence
+            -- we&#39;ve reached our goal, so we insert the node inbetween root
+            -- and the node next to root.
+            old ← right of root
+            right of root ← elem
+            right of elem ← old
+        else:
+            if level ≤ height:
+                -- Our level is below the height, hence we need to insert a
+                -- link before we go on.
+                old ← right of root
+                right of root ← elem
+                right of elem ← old
+
+            -- Go a level down.
+            return insert(elem, below root, height, level - 1)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The above algorithm is recursive, but we can with relative ease turn it into an iterative form (or let tail-call optimization do the job for us).&lt;/p&gt;
+
+&lt;p&gt;As an example, here&amp;rsquo;s a diagram, the curved lines marks overshoots/edges where a new node is inserted:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/jr9V8Ot.png&#34; alt=&#34;An example&#34; /&gt;&lt;/p&gt;
+
+&lt;h1 id=&#34;waste-waste-everywhere&#34;&gt;Waste, waste everywhere&lt;/h1&gt;
+
+&lt;p&gt;That seems fine doesn&amp;rsquo;t it? No, not at all. It&amp;rsquo;s absolute garbage.&lt;/p&gt;
+
+&lt;p&gt;There is a total and complete waste of space going on. Let&amp;rsquo;s assume there are &lt;b style=&#34;font: 400 1.21em KaTeX_Math&#34;&gt;n&lt;/b&gt; elements, then the tallest node is approximately &lt;b style=&#34;font: 400 1.21em KaTeX_Main&#34;&gt;&lt;i&gt;h = &lt;/i&gt;log&lt;sub&gt;2&lt;/sub&gt; &lt;i&gt;n&lt;/i&gt;&lt;/b&gt;, that gives us approximately &lt;b style=&#34;font: 400 1.21em KaTeX_Main&#34;&gt;1 + Σ&lt;sub&gt;&lt;i&gt;k ←0..h&lt;/i&gt;&lt;/sub&gt; &lt;i&gt;&lt;/i&gt;2&lt;sup&gt;&lt;i&gt;-k&lt;/i&gt;&lt;/sup&gt; n ≈ 2&lt;i&gt;n&lt;/i&gt;&lt;/b&gt;.&lt;/p&gt;
+
+&lt;p&gt;&lt;b style=&#34;font: 400 1.21em KaTeX_Math&#34;&gt;2&lt;i&gt;n&lt;/i&gt;&lt;/b&gt; is certainly no small amount, especially if you consider what each node contains, a pointer to the inner data, the node right and down, giving 5 pointers in total, so a single structure of &lt;b style=&#34;font: 400 1.21em KaTeX_Math&#34;&gt;&lt;i&gt;n&lt;/i&gt;&lt;/b&gt; nodes consists of approximately &lt;b style=&#34;font: 400 1.21em KaTeX_Math&#34;&gt;6&lt;i&gt;n&lt;/i&gt;&lt;/b&gt; pointers.&lt;/p&gt;
+
+&lt;p&gt;But memory isn&amp;rsquo;t even the main concern! When you need to follow a pointer on every decrease (apprx. 50% of all the links), possibly leading to cache misses. It turns out that there is a really simple fix for solving this:&lt;/p&gt;
+
+&lt;p&gt;Instead of linking vertically, a good implementation should consist of a singly linked list, in which each node contains  an array (representing the nodes above) with pointers to later nodes:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/Fd6gDLv.png&#34; alt=&#34;A better skip list.&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;If you represent the links (&amp;ldquo;shortcuts&amp;rdquo;) through dynamic arrays, you will still often get cache miss. Particularly, you might get a cache miss on both the node itself (which is not data local) and/or the dynamic array. As such, I recommend using a fixed-size array (beware of the two negative downsides: 1. more space usage, 2. a hard limit on the highest level, and the implication of linear upperbound when &lt;i style=&#34;font: 400 1.21em KaTeX_Math&#34;&gt;h &amp;gt; c&lt;/i&gt;. Furthermore, you should keep small enough to fit a cache line.).&lt;/p&gt;
+
+&lt;p&gt;Searching is done by following the top shortcuts as long as you don&amp;rsquo;t overshoot your target, then you decrement the level and repeat, until you reach the lowest level and overshoot. Here&amp;rsquo;s an example of searching for &amp;ldquo;22&amp;rdquo;:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/cQsPnGa.png&#34; alt=&#34;Searching for &amp;quot;22&amp;quot;.&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;In pseudocode:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;define search(skip_list, needle):
+    -- Initialize to the first node at the highest level.
+    level ← max_level
+    current_node ← root of skip_list
+
+    loop:
+        -- Go right until we overshoot.
+        while level&#39;th shortcut of current_node &amp;lt; needle:
+            current_node ← level&#39;th shortcut of current_node
+
+        if level = 0:
+            -- We hit our target.
+            return current_node
+        else:
+            -- Decrement the level.
+            level ← level - 1
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h1 id=&#34;b-style-font-400-1-21em-katex-math-o-1-b-level-generation&#34;&gt;&lt;b style=&#34;font: 400 1.21em KaTeX_Math&#34;&gt;O(1)&lt;/b&gt; level generation&lt;/h1&gt;
+
+&lt;p&gt;Even William Pugh did this mistake in &lt;a href=&#34;http://epaperpress.com/sortsearch/download/skiplist.pdf&#34;&gt;his original paper&lt;/a&gt;. The problem lies in the way the level is generated: Repeating coin flips (calling the random number generator, and checking parity), can mean a couple of RNG state updates (approximately 2 on every insertion). If your RNG is a slow one (e.g. you need high security against DOS attacks), this is noticable.&lt;/p&gt;
+
+&lt;p&gt;The output of the RNG is uniformly distributed, so you need to apply some function which can transform this into the desired distribution. My favorite is this one:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;define generate_level():
+    -- First we apply some mask which makes sure that we don&#39;t get a level
+    -- above our desired level. Then we find the first set bit.
+    ffz(random() &amp;amp; ((1 &amp;lt;&amp;lt; max_level) - 1))
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This of course implies that you &lt;code&gt;max_level&lt;/code&gt; is no higher than the bit width of the &lt;code&gt;random()&lt;/code&gt; output. In practice, most RNGs return 32-bit or 64-bit integers, which means this shouldn&amp;rsquo;t be a problem, unless you have more elements than there can be in your address space.&lt;/p&gt;
+
+&lt;h1 id=&#34;improving-cache-efficiency&#34;&gt;Improving cache efficiency&lt;/h1&gt;
+
+&lt;p&gt;A couple of techniques can be used to improve the cache efficiency:&lt;/p&gt;
+
+&lt;h2 id=&#34;memory-pools&#34;&gt;Memory pools&lt;/h2&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/Wa8IVBJ.png&#34; alt=&#34;A skip list in a memory pool.&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Our nodes are simply fixed-size blocks, so we can keep them data local, with high allocation/deallocation performance, through linked memory pools (SLOBs), which is basically just a list of free objects.&lt;/p&gt;
+
+&lt;p&gt;The order doesn&amp;rsquo;t matter. Indeed, if we swap &amp;ldquo;9&amp;rdquo; and &amp;ldquo;7&amp;rdquo;, we can suddenly see that this is simply a skip list:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/O863RR1.png&#34; alt=&#34;It&#39;s true.&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;We can keep these together in some arbitrary number of (not necessarily consecutive) pages, drastically reducing cache misses, when the nodes are of smaller size.&lt;/p&gt;
+
+&lt;p&gt;Since these are pointers into memory, and not indexes in an array, we need not reallocate on growth. We can simply extend the free list.&lt;/p&gt;
+
+&lt;h2 id=&#34;flat-arrays&#34;&gt;Flat arrays&lt;/h2&gt;
+
+&lt;p&gt;If we are interested in compactness and have a insertion/removal ratio near to 1, a variant of linked memory pools can be used: We can store the skip list in a flat array, such that we have indexes into said array instead of pointers.&lt;/p&gt;
+
+&lt;h2 id=&#34;unrolled-lists&#34;&gt;Unrolled lists&lt;/h2&gt;
+
+&lt;p&gt;Unrolled lists means that instead of linking each element, you link some number of fixed-size chuncks contains two or more elements (often the chunk is around 64 bytes, i.e. the normal cache line size).&lt;/p&gt;
+
+&lt;p&gt;Unrolling is essential for a good cache performance. Depending on the size of the objects you store, unrolling can reduce cache misses when following links while searching by 50-80%.&lt;/p&gt;
+
+&lt;p&gt;Here&amp;rsquo;s an example of an unrolled skip list:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/FYpPQPh.png&#34; alt=&#34;A simple 4 layer unrolled skip list.&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The gray box marks excessive space in the chunk, i.e. where new elements can be placed. Searching is done over the skip list, and when a candidate is found, the chunk is searched through &lt;strong&gt;linear&lt;/strong&gt; search. To insert, you push to the chunk (i.e. replace the first free space). If no excessive space is available, the insertion happens in the skip list itself.&lt;/p&gt;
+
+&lt;p&gt;Note that these algorithms requires information about how we found the chunk. Hence we store a &amp;ldquo;back look&amp;rdquo;, an array of the last node visited, for each level. We can then backtrack if we couldn&amp;rsquo;t fit the element into the chunk.&lt;/p&gt;
+
+&lt;p&gt;We effectively reduce cache misses by some factor depending on the size of the object you store. This is due to fewer links need to be followed before the goal is reached.&lt;/p&gt;
+
+&lt;h1 id=&#34;self-balancing-skip-lists&#34;&gt;Self-balancing skip lists&lt;/h1&gt;
+
+&lt;p&gt;Various techniques can be used to improve the height generation, to give a better distribution. In other words, we make the level generator aware of our nodes, instead of purely random, independent RNGs.&lt;/p&gt;
+
+&lt;h2 id=&#34;self-correcting-skip-list&#34;&gt;Self-correcting skip list&lt;/h2&gt;
+
+&lt;p&gt;The simplest way to achieve a content-aware level generator is to keep track of the number of node of each level in the skip list. If we assume there are &lt;b style=&#34;font: 400 1.21em KaTeX_Math&#34;&gt;&lt;i&gt;n&lt;/i&gt;&lt;/b&gt; nodes, the expected number of nodes with level &lt;b style=&#34;font: 400 1.21em KaTeX_Math&#34;&gt;&lt;i&gt;l&lt;/i&gt;&lt;/b&gt; is &lt;b style=&#34;font: 400 1.21em KaTeX_Main&#34;&gt;2&lt;sup&gt;&lt;i&gt;-l&lt;/i&gt;&lt;/sup&gt;&lt;i&gt;n&lt;/i&gt;&lt;/b&gt;. Subtracting this from actual number gives us a measure of how well-balanced each height is:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://i.imgur.com/bBf7kcg.png&#34; alt=&#34;Balance&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;When we generate a new node&amp;rsquo;s level, you choose one of the heights with the biggest under-representation (see the black line in the diagram), either randomly or by some fixed rule (e.g. the highest or the lowest).&lt;/p&gt;
+
+&lt;h2 id=&#34;perfectly-balanced-skip-lists&#34;&gt;Perfectly balanced skip lists&lt;/h2&gt;
+
+&lt;p&gt;Perfect balancing often ends up hurting performance, due to backwards level changes, but it is possible. The basic idea is to reduce the most over-represented level when removing elements.&lt;/p&gt;
+
+&lt;h1 id=&#34;an-extra-remark&#34;&gt;An extra remark&lt;/h1&gt;
+
+&lt;p&gt;Skip lists are wonderful as an alternative to Distributed Hash Tables. Performance is mostly about the same, but skip lists are more DoS resistant if you make sure that all links are F2F.&lt;/p&gt;
+
+&lt;p&gt;Each node represents a node in the network. Instead of having a head node and a nil node, we connect the ends, so any machine can search starting at it self:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/moD7oy9.png&#34; alt=&#34;A network organized as a skip list.&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;If you want a secure open system, the trick is that any node can invite a node, giving it a level equal to or lower than the level itself. If the node control the key space in the interval of A to B, we partition it into two and transfer all KV pairs in the second part to the new node. Obviously, this approach has no privilege escalation, so you can&amp;rsquo;t initialize a sybil attack easily.&lt;/p&gt;
+
+&lt;h1 id=&#34;conclusion-and-final-words&#34;&gt;Conclusion and final words&lt;/h1&gt;
+
+&lt;p&gt;By apply a lot of small, subtle tricks, we can drastically improve performance of skip lists, providing a simpler and faster alternative to Binary Search Trees. Many of these are really just minor tweaks, but give an absolutely enormous speed-up.&lt;/p&gt;
+
+&lt;p&gt;The diagrams were made with &lt;a href=&#34;https://en.wikipedia.org/wiki/Dia_(software)&#34;&gt;Dia&lt;/a&gt; and &lt;a href=&#34;https://en.wikipedia.org/wiki/PGF/TikZ&#34;&gt;TikZ&lt;/a&gt;.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

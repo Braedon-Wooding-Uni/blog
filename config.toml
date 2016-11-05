@@ -1,22 +1,16 @@
-baseurl = "/"
+baseurl = "http://ticki.github.io/"
 languagecode = "en-us"
-title = "Ticki"
+title = "Ticki's blog"
+summerization = "html_firstparagraph"
+paginate = 9
 theme = "bleak"
-pygmentsuseclasses = true
-
-contentdir =                 "content"
-statictdir =                 "static"
-layoutsdir =                 "layouts"
-dataDir =                    "data"
-defaultExtension =           "html"
-defaultLayout =              "post"
 
 DisqusShortname = "http-ticki-github-io"
 disqus_identifier = "http-ticki-github-io"
 
 [permalinks]
-    page = "blog/:filename/"
-    post = "blog/:filename/"
+    post = "/blog/:slug/"
+    # post = "/post/:year/:month/:day/:slug"
 
 [[menu.main]]
     name = "About"
@@ -33,8 +27,12 @@ disqus_identifier = "http-ticki-github-io"
   topic = "topics"
 
 [params]
+    cover = "/cover.png"
+    Subtitle = "A blog about the beauty of mathematics and computer science."
+    description = "This blog contains my thoughts, ideas, and humble discoveries in mathematics and computer science."
+
     disqus = "http-ticki-github-io"
-    description = "Howdy, this is my blog!"
     logo = "/logo.png"
     hideHUGOSupport = false
-    githubName = "ticki"
+    github = "ticki"
+    twitter = "ticki_"

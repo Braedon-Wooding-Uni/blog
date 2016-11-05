@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Tui on Ticki&#39;s blog</title>
+    <link>http://ticki.github.io/tags/tui/</link>
+    <description>Recent content in Tui on Ticki&#39;s blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 06 Oct 2016 10:12:22 +0200</lastBuildDate>
+    <atom:link href="http://ticki.github.io/tags/tui/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Making Terminal Applications in Rust with Termion</title>
+      <link>http://ticki.github.io/blog/making-terminal-applications-in-rust-with-termion/</link>
+      <pubDate>Thu, 06 Oct 2016 10:12:22 +0200</pubDate>
+      
+      <guid>http://ticki.github.io/blog/making-terminal-applications-in-rust-with-termion/</guid>
+      <description>
+
+&lt;p&gt;This post will walk through the basics of implementing a terminal (TTY) application for both new beginners and experienced users of Rust.&lt;/p&gt;
+
+&lt;h1 id=&#34;introduction&#34;&gt;Introduction&lt;/h1&gt;
+
+&lt;p&gt;Terminal applications play an important role in many programmers&amp;rsquo; toolchain, from text editors to minigames while your code is compiling. And it&amp;rsquo;s great to know and understand how to make these yourself, so you can create a customized TUI application for your needs.&lt;/p&gt;
+
+&lt;p&gt;Escape codes and TTY I/O is messy, but fortunately there are libraries for this. We will use &lt;a href=&#34;https://github.com/ticki/termion&#34;&gt;Termion&lt;/a&gt;, which is the most feature-complete TUI library in pure Rust.&lt;/p&gt;
+
+&lt;p&gt;Termion is pretty simple and straight-forward. This &amp;ldquo;tutorial&amp;rdquo; or guide is going to walk through these in a manner that even Rust new beginners can understand.&lt;/p&gt;
+
+&lt;h1 id=&#34;understanding-the-tty&#34;&gt;Understanding the TTY&lt;/h1&gt;
+
+&lt;p&gt;Ignoring historical facts, the TTY is the name of the virtual device that takes some stream of text and presents it to the user. As opposed to sophisticated UIs and graphics, it is incredibly simple to get started with.&lt;/p&gt;
+
+&lt;p&gt;The terminal emulator keeps a grid of characters, and a cursor. When you write to the standard output the cell is overwritten with the new character and the cursor moves respectively.&lt;/p&gt;
+
+&lt;p&gt;Take the code,&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;println!(&amp;quot;Text here.&amp;quot;);
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;All this does is writing some text to the standard output, and when you run this program, &amp;ldquo;Text here.&amp;rdquo; should appear before the TTY cursor.&lt;/p&gt;
+
+&lt;p&gt;If this is all we can do, how can we create interactive TTY applications? Well, it turns out that there is a whole lot more, we can do.&lt;/p&gt;
+
+&lt;p&gt;Certain sequences represents some operations to the TTY. These are called &amp;ldquo;escape sequences&amp;rdquo; and can do things like changing the color of the text, change the background, moving the cursor, clearing the screen, and so on. Writing these codes by hand quickly gets messy, so we let Termion do it for us:&lt;/p&gt;
+
+&lt;h1 id=&#34;setting-up-termion&#34;&gt;Setting up Termion&lt;/h1&gt;
+
+&lt;p&gt;Start by making sure &lt;code&gt;cargo&lt;/code&gt; is installed, then do&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;# Initialize a new cargo repository.
+cargo new --bin my-tui-app
+# Cd into it
+cd my-tui-app
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Then open the &lt;code&gt;Cargo.toml&lt;/code&gt; file with your favorite text editor, and add&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;termion = &amp;quot;1&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;To the file under the section &lt;code&gt;[dependencies]&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Then open up &lt;code&gt;src/lib.rs&lt;/code&gt; and add&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;extern crate termion;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now everything is ready to start!&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;For documentation, see &lt;a href=&#34;https://github.com/ticki/termion&#34;&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;h1 id=&#34;the-structure-of-termion&#34;&gt;The structure of Termion&lt;/h1&gt;
+
+&lt;p&gt;Termion is divided into 8 different modules each providing different functions and primitives:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;clear&lt;/code&gt;: For clearing the screen or parts of the screen.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;color&lt;/code&gt;: For changing the foreground or background color of the text.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;cursor&lt;/code&gt;: For moving the cursor around.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;event&lt;/code&gt;: For handling mouse cursor or modifiers.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;input&lt;/code&gt;: For getting more advanced user input (like asynchronous user input).&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;raw&lt;/code&gt;: Switching to raw mode (we will get back to this later)&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;scroll&lt;/code&gt;: Scrolling up or down the text stream.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;style&lt;/code&gt;: Changing the text style or formatting.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;color&#34;&gt;Color&lt;/h2&gt;
+
+&lt;p&gt;Since escapes really are nothing but just another text output, we use the &lt;code&gt;std::fmt::Display&lt;/code&gt; to generate the escape codes. This means that we can use it with macros like &lt;code&gt;write!&lt;/code&gt; or &lt;code&gt;println!&lt;/code&gt;. If we want red text for example, we can do simply:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;extern crate termion;
+
+// Import the color module.
+use termion::color;
+
+fn main() {
+    println!(&amp;quot;{red}more red than any comrade{reset}&amp;quot;,
+             red   = color::Fg(color::Red),
+             reset = color::Fg(color::Reset));
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;code&gt;color::Fg&lt;/code&gt; specifies that we want to change the &lt;em&gt;foreground color&lt;/em&gt; (i.e. the color of the text), &lt;code&gt;color::Fg(color::Reset)&lt;/code&gt; means that we &lt;em&gt;reset&lt;/em&gt; the foreground color.&lt;/p&gt;
+
+&lt;h2 id=&#34;clear&#34;&gt;Clear&lt;/h2&gt;
+
+&lt;p&gt;Clearing the screen allows you to remove text which is already written without overwriting it manually with spaces. For example, I can easily implement the &lt;code&gt;clear&lt;/code&gt; command:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;extern crate termion;
+
+// Import the `clear` module.
+use termion::clear;
+
+fn main() {
+    println!(&amp;quot;{}&amp;quot;, clear::All);
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;It should be pretty obvious that &lt;code&gt;clear::All&lt;/code&gt; clears the whole grid, but what if we only want to clear the screen partially?&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;clear::CurrentLine&lt;/code&gt; will leave the current line empty.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;clear::AfterCursor&lt;/code&gt; clears from the cursor to the end of the grid.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;clear::BeforeCursor&lt;/code&gt; clears from the cursor to the beginning of the grid.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;a href=&#34;https://docs.rs/termion/1.1.1/termion/clear/index.html&#34;&gt;and so on&amp;hellip;&lt;/a&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;cursor&#34;&gt;Cursor&lt;/h2&gt;
+
+&lt;p&gt;What if I want to jump back and overwrite what I just wrote? The easy way is to use &lt;code&gt;\r&lt;/code&gt;, which will jump back to the start of the line:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;extern crate termion;
+
+use termion::{color, clear};
+use std::time::Duration;
+use std::thread;
+
+fn main() {
+    println!(&amp;quot;{red}more red than any comrade{reset}&amp;quot;,
+             red   = color::Fg(color::Red),
+             reset = color::Fg(color::Reset));
+    // Sleep for a short period of time.
+    thread::sleep(Duration::from_millis(300));
+    // Go back;
+    println!(&amp;quot;\r&amp;quot;);
+    // Clear the line and print some new stuff
+    print!(&amp;quot;{clear}{red}g{blue}a{green}y{red} space communism{reset}&amp;quot;,
+            clear = clear::CurrentLine,
+            red   = color::Fg(color::Red),
+            blue  = color::Fg(color::Blue),
+            green = color::Fg(color::Green),
+            reset = color::Fg(color::Reset));
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;But actually, &lt;code&gt;\r&lt;/code&gt; is pretty limited, because it only allows us to jump to the start of the line. What if we want to jump to an arbitrary cell in the text grid?&lt;/p&gt;
+
+&lt;p&gt;Well, we can do that with &lt;code&gt;cursor::Goto&lt;/code&gt;, say we want to print the text at (4,2):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;extern crate termion;
+
+use termion::{color, cursor, clear};
+
+fn main() {
+    println!(&amp;quot;{clear}{goto}{red}more red than any comrade{reset}&amp;quot;,
+             // Full screen clear.
+             clear = clear::All,
+             // Goto the cell.
+             goto  = cursor::Goto(4, 2),
+             red   = color::Fg(color::Red),
+             reset = color::Fg(color::Reset));
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;style&#34;&gt;Style&lt;/h2&gt;
+
+&lt;p&gt;What if I want my gay space communism to have style?&lt;/p&gt;
+
+&lt;p&gt;The &lt;code&gt;style&lt;/code&gt; module provides escape codes for that. For example, let&amp;rsquo;s print it in bold (&lt;code&gt;style::Bold&lt;/code&gt;):&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;extern crate termion;
+
+use termion::{color, clear, style};
+
+fn main() {
+    println!(&amp;quot;{bold}{red}g{blue}a{green}y{red} space communism{reset}&amp;quot;,
+            bold  = style::Bold,
+            red   = color::Fg(color::Red),
+            blue  = color::Fg(color::Blue),
+            green = color::Fg(color::Green),
+            reset = style::Reset);
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Neat. Now we can control the cursor, clear stuff, set color, and set style. That should be good enough to get us started.&lt;/p&gt;
+
+&lt;h1 id=&#34;entering-raw-mode&#34;&gt;Entering raw mode&lt;/h1&gt;
+
+&lt;p&gt;Without raw mode, you cannot write a proper interactive TTY application. Raw mode gives you complete control over the TTY:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;It disables the line buffering: As you might notice, your command-line application tends to behave like the command-line. The programs will first get the input when the user types &lt;code&gt;\n&lt;/code&gt;. Raw mode makes the program get the input after every key stroke.&lt;/li&gt;
+&lt;li&gt;It disables displaying the input: Without raw mode, the things you type appear on the screen, making it insufficient for most interactive TTY applications, where keys can represent controls and not textual input.&lt;/li&gt;
+&lt;li&gt;It disables canonicalization of the output: For example, &lt;code&gt;\n&lt;/code&gt; represents &amp;ldquo;go one cell down&amp;rdquo; not &amp;ldquo;break the line&amp;rdquo;, for line breaks &lt;code&gt;\n\r&lt;/code&gt; is needed.&lt;/li&gt;
+&lt;li&gt;It disables scrolling.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;So, how do we enter raw mode?&lt;/p&gt;
+
+&lt;p&gt;It&amp;rsquo;s not that hard:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;use termion::raw::IntoRawMode;
+use std::io::{Write, stdout};
+
+fn main() {
+    // Enter raw mode.
+    let mut stdout = stdout().into_raw_mode().unwrap();
+
+    // Write to stdout (note that we don&#39;t use `println!`)
+    writeln!(stdout, &amp;quot;Hey there.&amp;quot;).unwrap();
+
+    // Here the destructor is automatically called, and the terminal state is restored.
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h1 id=&#34;inputs&#34;&gt;Inputs&lt;/h1&gt;
+
+&lt;p&gt;Keys and modifiers are somewhat oddly encoded in the ANSI standards, and fortunately Termion parses those for you. If you take a look at the &lt;a href=&#34;https://docs.rs/termion/1.1.1/termion/input/trait.TermRead.html&#34;&gt;&lt;code&gt;TermRead&lt;/code&gt;&lt;/a&gt; trait, you&amp;rsquo;ll see the method called &lt;code&gt;keys&lt;/code&gt;. This returns an iterator over &lt;a href=&#34;https://docs.rs/termion/1.1.1/termion/event/enum.Key.html&#34;&gt;&lt;code&gt;Key&lt;/code&gt;&lt;/a&gt;, an enum which contains the parsed keys.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;extern crate termion;
+
+use termion::event::Key;
+use termion::input::TermRead;
+use termion::raw::IntoRawMode;
+use std::io::{Write, stdout, stdin};
+
+fn main() {
+    // Get the standard input stream.
+    let stdin = stdin();
+    // Get the standard output stream and go to raw mode.
+    let mut stdout = stdout().into_raw_mode().unwrap();
+
+    write!(stdout, &amp;quot;{}{}q to exit. Type stuff, use alt, and so on.{}&amp;quot;,
+           // Clear the screen.
+           termion::clear::All,
+           // Goto (1,1).
+           termion::cursor::Goto(1, 1),
+           // Hide the cursor.
+           termion::cursor::Hide).unwrap();
+    // Flush stdout (i.e. make the output appear).
+    stdout.flush().unwrap();
+
+    for c in stdin.keys() {
+        // Clear the current line.
+        write!(stdout, &amp;quot;{}{}&amp;quot;, termion::cursor::Goto(1, 1), termion::clear::CurrentLine).unwrap();
+
+        // Print the key we type...
+        match c.unwrap() {
+            // Exit.
+            Key::Char(&#39;q&#39;) =&amp;gt; break,
+            Key::Char(c)   =&amp;gt; println!(&amp;quot;{}&amp;quot;, c),
+            Key::Alt(c)    =&amp;gt; println!(&amp;quot;Alt-{}&amp;quot;, c),
+            Key::Ctrl(c)   =&amp;gt; println!(&amp;quot;Ctrl-{}&amp;quot;, c),
+            Key::Left      =&amp;gt; println!(&amp;quot;&amp;lt;left&amp;gt;&amp;quot;),
+            Key::Right     =&amp;gt; println!(&amp;quot;&amp;lt;right&amp;gt;&amp;quot;),
+            Key::Up        =&amp;gt; println!(&amp;quot;&amp;lt;up&amp;gt;&amp;quot;),
+            Key::Down      =&amp;gt; println!(&amp;quot;&amp;lt;down&amp;gt;&amp;quot;),
+            _              =&amp;gt; println!(&amp;quot;Other&amp;quot;),
+        }
+
+        // Flush again.
+        stdout.flush().unwrap();
+    }
+
+    // Show the cursor again before we exit.
+    write!(stdout, &amp;quot;{}&amp;quot;, termion::cursor::Show).unwrap();
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;What the above snippet does is to open a blank screen, where it informs you what keys and modifiers you type as you press keys.&lt;/p&gt;
+
+&lt;h1 id=&#34;asynchronized-stdin&#34;&gt;Asynchronized stdin&lt;/h1&gt;
+
+&lt;p&gt;One interesting problem you will run into, while writing certain terminal application is that the stdin is blocking, and you need to wait to the user giving the input. This potentially could block your application from doing work while waiting for user input (e.g. you freeze the graphics).&lt;/p&gt;
+
+&lt;p&gt;Fortunately, Termion has a solution to that &lt;a href=&#34;https://docs.rs/termion/1.1.1/termion/fn.async_stdin.html&#34;&gt;&lt;code&gt;termion::async_stdin()&lt;/code&gt;&lt;/a&gt;. In principle, it is really simple. It works around the limitation to TTYs by using another thread to read from the stdin, and when your main thread needs to read from the stream, it pops from a concurrent queue to read the bytes. It doesn&amp;rsquo;t scale to things like byte streams, but it works seamlessly with user input.&lt;/p&gt;
+
+&lt;h1 id=&#34;mouse&#34;&gt;Mouse&lt;/h1&gt;
+
+&lt;p&gt;You can read mouse clicks etc. by converting your stdin stream to &lt;a href=&#34;https://docs.rs/termion/1.1.1/termion/input/struct.MouseTerminal.html&#34;&gt;&lt;code&gt;termion::input::MouseTerminal&lt;/code&gt;&lt;/a&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;extern crate termion;
+
+use termion::event::*;
+use termion::cursor;
+use termion::input::{TermRead, MouseTerminal};
+use termion::raw::IntoRawMode;
+use std::io::{self, Write};
+
+fn main() {
+    let stdin = io::stdin();
+    let mut stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
+    // ...
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Then we can clear the screen:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;    writeln!(stdout,
+             &amp;quot;{}{}q to exit. Type stuff, use alt, click around...&amp;quot;,
+             termion::clear::All,
+             termion::cursor::Goto(1, 1))
+        .unwrap();
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Then you can read mouse inputs through the &lt;code&gt;events()&lt;/code&gt; function:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;    for c in stdin.events() {
+        let evt = c.unwrap();
+        match evt {
+            Event::Key(Key::Char(&#39;q&#39;)) =&amp;gt; break,
+            Event::Mouse(me) =&amp;gt; {
+                match me {
+                    MouseEvent::Press(_, a, b) |
+                    MouseEvent::Release(a, b) |
+                    MouseEvent::Hold(a, b) =&amp;gt; {
+                        write!(stdout, &amp;quot;{}&amp;quot;, cursor::Goto(a, b)).unwrap();
+                    }
+                }
+            }
+            _ =&amp;gt; {}
+        }
+        stdout.flush().unwrap();
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now, if you click around or hold your your mouse, the TTY cursor should follow.&lt;/p&gt;
+
+&lt;h1 id=&#34;a-few-extra-tricks&#34;&gt;A few extra tricks&lt;/h1&gt;
+
+&lt;h2 id=&#34;the-terminal-size&#34;&gt;The terminal size&lt;/h2&gt;
+
+&lt;p&gt;Sometimes you might want to center or align things. This need the terminal size, which can be obtained by &lt;a href=&#34;https://docs.rs/termion/1.1.1/termion/fn.terminal_size.html&#34;&gt;&lt;code&gt;termion::terminal_size()&lt;/code&gt;&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2 id=&#34;bypassing-piped-input&#34;&gt;Bypassing piped input&lt;/h2&gt;
+
+&lt;p&gt;Sometimes you might want to pipe some input to your program while controling the TTY. This is actually not that hard. With &lt;a href=&#34;https://docs.rs/termion/1.1.1/termion/fn.get_tty.html&#34;&gt;&lt;code&gt;termion::get_tty()&lt;/code&gt;&lt;/a&gt;, you can read and write from the TTY, while still being able to read or write to stdin/stdout via &lt;code&gt;std::io&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2 id=&#34;truecolor&#34;&gt;Truecolor&lt;/h2&gt;
+
+&lt;p&gt;&lt;a href=&#34;https://docs.rs/termion/1.1.1/termion/color/struct.Rgb.html&#34;&gt;&lt;code&gt;termion::color::Rgb(r, g, b)&lt;/code&gt;&lt;/a&gt; allows you to use full 24-bit truecolor.&lt;/p&gt;
+
+&lt;h1 id=&#34;trying-all-this-out-yourself&#34;&gt;Trying all this out yourself&lt;/h1&gt;
+
+&lt;p&gt;There&amp;rsquo;s a lot of things you can do as well:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Writing a simple nano clone.&lt;/li&gt;
+&lt;li&gt;Writing a TUI music player.&lt;/li&gt;
+&lt;li&gt;Writing a TODO list manager.&lt;/li&gt;
+&lt;li&gt;Writing an interactive TUI file manager.&lt;/li&gt;
+&lt;li&gt;Writing a game.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h1 id=&#34;reference-programs-and-examples&#34;&gt;Reference programs and examples&lt;/h1&gt;
+
+&lt;p&gt;If you need a hands-on reference or examples on using termion, you can check out one of the following:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/ticki/termion/tree/master/examples&#34;&gt;The termion examples&lt;/a&gt;* (easy/overview)&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/ticki/rem/blob/master/src/main.rs&#34;&gt;An utility to set countdowns/reminders in the terminal&lt;/a&gt;* (easy)&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/hoodie/battery-rs&#34;&gt;An utility to get the battery status from command line&lt;/a&gt;* (easy)&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/redox-os/games-for-redox/blob/master/src/ice/main.rs&#34;&gt;Pokemon-style ice sliding puzzle for terminal&lt;/a&gt;* (medium)&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/redox-os/games-for-redox/blob/master/src/minesweeper/main.rs&#34;&gt;Minesweeper implementation&lt;/a&gt;* (medium)&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/redox-os/games-for-redox/blob/master/src/snake/main.rs&#34;&gt;Snake implementation&lt;/a&gt; (medium)&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/ca1ek/ircim&#34;&gt;An IRC client&lt;/a&gt; (medium)&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/MovingtoMars/liner&#34;&gt;A line-editing library&lt;/a&gt; (medium)&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/IGI-111/Smith&#34;&gt;A standalone editor&lt;/a&gt; (hard)&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/Munksgaard/inquirer-rs&#34;&gt;A more high-level TTY library built on top of Termion&lt;/a&gt; (hard)&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://github.com/little-dude/xi-tui&#34;&gt;A Termion Xi-editor frontend&lt;/a&gt; (hard)&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;ul&gt;
+&lt;li&gt;= Recommended as reference or example.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;If you want your program added, just contact me.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

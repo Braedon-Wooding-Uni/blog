@@ -1,0 +1,527 @@
+
+<!DOCTYPE html>
+<html lang="en-us">
+
+    <head>
+
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+        <meta property="og:title" content=" Skip Lists: Done Right &middot;  Ticki&#39;s blog" />
+        <meta property="og:site_name" content="Ticki&#39;s blog" />
+        <meta property="og:url" content="http://ticki.github.io/blog/skip-lists-done-right/" />
+
+    
+        <meta property="og:type" content="article" />
+        <meta property="og:article:published_time" content="2016-09-17T13:46:49&#43;02:00" />
+        <meta property="og:article:tag" content="data-structures" />
+        <meta property="og:article:tag" content="optimizations" />
+        <meta property="og:article:tag" content="algorithms" />
+        <meta property="og:article:tag" content="skip-lists" />
+        <meta property="og:article:tag" content="programming" />
+        
+
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:site" content="@ticki_" />
+        <meta name="twitter:creator" content="@ticki_" />
+        <meta name="twitter:title" content="Skip Lists: Done Right" />
+        <meta name="twitter:description" content="    Skip lists are a wonderful data structure, but it is hard to get\
+    right. This blog post presents various techniques to optimize and\
+    improve the implementation of skip lists.
+" />
+        <meta name="twitter:url" content="http://ticki.github.io/blog/skip-lists-done-right/" />
+    
+
+        <title> Skip Lists: Done Right &middot;  Ticki&#39;s blog</title>
+
+    
+        <meta name="description" content="    Skip lists are a wonderful data structure, but it is hard to get\
+    right. This blog post presents various techniques to optimize and\
+    improve the implementation of skip lists.
+" />
+    
+
+        <meta name="p:domain_verify" content="fc173d84e3a4de948ed4bda2908afd3e"/>
+        <meta name="HandheldFriendly" content="True" />
+        <meta name="MobileOptimized" content="320" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        
+        
+
+    
+        <link href="http://ticki.github.io/index.xml" rel="alternate" type="application/rss+xml" title="Ticki&#39;s blog" />
+    
+
+    
+        <link rel="canonical" href="http://ticki.github.io/blog/skip-lists-done-right/" />
+
+    
+    <script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "Article",
+        "headline": "Skip Lists: Done Right",
+        "author": {
+            "@type": "Person",
+            "name": "http://profiles.google.com/?rel=author"
+        },
+        "datePublished": "2016-09-17",
+        "description": "    Skip lists are a wonderful data structure, but it is hard to get\\\n    right. This blog post presents various techniques to optimize and\\\n    improve the implementation of skip lists.\n",
+        "wordCount":  2035 
+    }
+
+    </script>
+
+    <script type="text/javascript">
+    
+    
+      var disqus_shortname = 'http-ticki-github-io';
+      var disqus_identifier = 'http:\/\/ticki.github.io\/blog\/skip-lists-done-right\/';
+      var disqus_title = 'Skip Lists: Done Right';
+      var disqus_url = 'http:\/\/ticki.github.io\/blog\/skip-lists-done-right\/';
+    
+
+    </script>
+    
+
+    <style>
+@charset "UTF-8";article,header,img,main,nav,section{display:block}blockquote,p,pre,ul{margin:2em auto}#wrapper,pre{width:100%;box-sizing:border-box}#nav,#wrapper,code{position:relative}#nav,body{background:#fff}#menu,blockquote,pre code{background:0 0}#menu,#menu .menu-header,#menu .menu-list,#wrapper,.post-nav .post-nav-item .post-nav-teaser .post-nav-info,blockquote,pre{box-sizing:border-box}img{border:0;max-width:100%;height:auto;margin:2.5em auto}html{font-family:sans-serif;-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%}code,pre{font-family:monospace,monospace;font-size:1em}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:300;src:local("Merriweather Sans Light"),local("MerriweatherSans-Light"),url(//fonts.gstatic.com/s/merriweathersans/v5/6LmGj5dOJopQKEkt88GowY_zIojJi0m4a5Z6tRh6itY.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:400;src:local("Merriweather Sans Regular"),local("MerriweatherSans-Regular"),url(//fonts.gstatic.com/s/merriweathersans/v5/AKu1CjQ4qnV8MUltkAX3sL2aU247V0zTzydO4RoO9Ok.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:700;src:local("Merriweather Sans Bold"),local("MerriweatherSans-Bold"),url(//fonts.gstatic.com/s/merriweathersans/v5/6LmGj5dOJopQKEkt88GowQfd-b-I5PxxcmB4_-MNcqw.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:800;src:local("Merriweather Sans ExtraBold"),local("MerriweatherSans-ExtraBold"),url(//fonts.gstatic.com/s/merriweathersans/v5/6LmGj5dOJopQKEkt88GowWT7sFQ1Iz1BbpcuCPlgc9Q.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:italic;font-weight:300;src:local("Merriweather Sans Light Italic"),local("MerriweatherSans-LightItalic"),url(//fonts.gstatic.com/s/merriweathersans/v5/nAqt4hiqwq3tzCecpgPmVX9UU5BmOJGkLxUCVv5VXdc.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:italic;font-weight:400;src:local("Merriweather Sans Italic"),local("MerriweatherSans-Italic"),url(//fonts.gstatic.com/s/merriweathersans/v5/3Mz4hOHzs2npRMG3B1ascf0KIgDhPIHb_R-SWdtqte8.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:italic;font-weight:700;src:local("Merriweather Sans Bold Italic"),local("MerriweatherSans-BoldItalic"),url(//fonts.gstatic.com/s/merriweathersans/v5/nAqt4hiqwq3tzCecpgPmVYM8pfYvjMoOxygpzLVILAs.woff) format("woff")}@font-face{font-family:Inconsolata;font-style:normal;font-weight:400;src:local("Inconsolata"),url(//fonts.gstatic.com/s/inconsolata/v12/BjAYBlHtW3CJxDcjzrnZCIbN6UDyHWBl620a-IRfuBk.woff) format("woff")}@font-face{font-family:Inconsolata;font-style:normal;font-weight:700;src:local("Inconsolata Bold"),local("Inconsolata-Bold"),url(//fonts.gstatic.com/s/inconsolata/v12/AIed271kqQlcIRSOnQH0yTqR_3kx9_hJXbbyU8S6IN0.woff) format("woff")}@font-face{font-family:icons;src:url(/fonts/icons.eot?9273991);src:url(/fonts/icons.eot?9273991#iefix) format("embedded-opentype"),url(/fonts/icons.woff?9273991) format("woff"),url(/fonts/icons.ttf?9273991) format("truetype"),url(/fonts/icons.svg?9273991#icons) format("svg");font-weight:400;font-style:normal}[class^=icon-]:before{font-family:icons;font-style:normal;font-weight:400;speak:none;display:inline-block;text-decoration:inherit;width:1em;margin-right:.2em;text-align:center;font-variant:normal;text-transform:none;line-height:1em;margin-left:.2em;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}.icon-arrow-left:before{content:'\e804'}.icon-arrow-right:before{content:'\e807'}.icon-rss:before{content:'\e808'}.icon-menu:before{content:'\e809'}body{margin:0;font:300 1em/1.5em 'Merriweather Sans',sans-serif;color:#595B66}blockquote,i{font-style:italic}code,pre{font-family:Inconsolata,monospace}a,blockquote,code,i{font-weight:400}::-moz-selection{color:#222;background:#D6EDFF;text-shadow:none}::-moz-selection,::selection{color:#222;background:#D6EDFF;text-shadow:none}a{background-color:transparent;color:inherit;text-decoration:none;transition:all ease-out .2s}.post-content a{border-bottom:2px solid #36D995}h1,h4{text-rendering:optimizeLegibility;color:#1F2026}h1{font-size:2em;line-height:1em;margin:2em 0 -.5em}h4{font-size:1.25em;line-height:1.2em;margin:2.4em 0 -.8em}ul{list-style:none;padding-left:3em}blockquote{padding:0 1em;border-left:.25em solid #D4D5D9;color:#595B66}blockquote *{margin:1em auto}blockquote :first-child{margin-top:0}blockquote :last-child{margin-bottom:0}i{color:#363740}code{display:inline-block;top:-1px;padding:3px 6px;margin:-1px 2px;font-size:.875em;line-height:1.143em;background:#E1E2E6;color:#000;border-radius:2px}pre{padding:1em;white-space:pre;overflow:auto;background:#9D9FA6;color:#fff}pre code{position:static;top:auto;font-size:1em;line-height:1.5em;white-space:-moz-pre-wrap;white-space:pre-wrap;vertical-align:inherit;border:none;padding:0}#menu .menu-header:before,.post .post-title:before{border-bottom:4px solid #36D995;content:''}.inner{max-width:48em;margin:0 auto;padding:0 1em}#wrapper{min-height:100vh;padding-bottom:6em;background:#F2F3F5}#push{-webkit-transform:translate3d(0,0,0);transform:translate3d(0,0,0);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;opacity:1}#nav{z-index:70;transition:all ease-out .4s;-webkit-transform:translate3d(0,0,0);transform:translate3d(0,0,0);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;opacity:1}#nav:after{clear:both;content:'';display:table}#nav .nav-logo{float:left;height:2em;padding:1em;max-width:50%}#nav .nav-logo img{width:auto;max-width:none;height:2em;margin:0}#nav .nav-menu{float:right}#nav .nav-menu:after{clear:both;content:'';display:table}#nav .nav-menu a{display:block;width:1em;height:1em;line-height:1em;padding:1.5em;text-align:center;float:left;cursor:pointer}#nav .nav-menu a i:before{margin:auto}#menu{display:none;position:fixed;left:50%;top:5%;width:30em;height:90%;margin-left:-15em;padding:3em 0 0;overflow:hidden;transition:all ease-out .3s;-webkit-transform:translate3d(0,2em,0);transform:translate3d(0,2em,0);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;opacity:0;z-index:100}@media only screen and (max-width:50em){#menu{width:90%;left:5%;margin-left:auto}}#menu .menu-header{position:absolute;left:0;top:0;width:100%;height:3.5em;padding:1em 1.5em .5em;margin-bottom:1em;line-height:2em;z-index:110;background:#fff}#menu .menu-header:before{position:absolute;left:-5%;bottom:-1em;width:110%;height:2em;background:#fff;box-shadow:0 .125em .125em rgba(0,0,0,.1);-webkit-transform:rotate(2.5deg);transform:rotate(2.5deg);transition:all ease-out .2s;z-index:115}#menu .menu-header:after{clear:both;content:'';display:table}#menu .menu-header .menu-label{position:relative;display:block;float:left;z-index:120}#menu .menu-header .menu-close{position:relative;display:block;float:right;width:2em;height:2em;padding:1em;margin:-1em -1.5em -1em 0;cursor:pointer;z-index:125}#menu .menu-header .menu-close:after,#menu .menu-header .menu-close:before{content:'';position:absolute;left:50%;top:50%;background:#9D9FA6;-webkit-transform:rotate(45deg);transform:rotate(45deg)}.overlay,.overlay:before{top:0;width:100%;height:100%}#menu .menu-header .menu-close:after{width:2px;height:1em;margin:-.5em 0 0 -1px}#menu .menu-header .menu-close:before{width:1em;height:2px;margin:-1px 0 0 -.5em}#menu .menu-list{position:relative;list-style:none;margin:0;padding:2em 0;height:100%;overflow-x:hidden;overflow-y:scroll;background:#fff}.overlay{position:fixed;left:0;z-index:80;display:none}.overlay:before{content:'';position:absolute;left:0;background:#1F2026;opacity:0;transition:all ease-out .3s;-webkit-transform-style:preserve-3d;transform-style:preserve-3d}.post{position:relative;z-index:20}.post .post-meta{display:block;font-size:.75em;line-height:1.334em;font-weight:400;margin-bottom:1.334em}.post .post-title{position:relative;color:#000;font-size:2em;line-height:1.375em;font-weight:800;text-indent:-1px;margin:.25em 0 .75em}.post .post-title:before{position:absolute;left:0;bottom:-.334em;width:1em;margin-bottom:-2px}.post .post-header{padding:4em 0 0;margin-bottom:3em}.post-footer .post-share a span{display:none}.post-nav .post-nav-item{position:fixed;top:50%;display:block;margin-top:-4em;overflow:hidden;border-radius:10em;transition:none}@media only screen and (max-width:70em){.post-nav .post-nav-item{position:absolute;top:auto;margin:auto;max-width:50%}}.post-nav .post-nav-item.post-nav-next{left:0;text-align:left}.post-nav .post-nav-item.post-nav-next .post-nav-icon{float:left}.post-nav .post-nav-item.post-nav-next .post-nav-icon i{left:-.05em}.post-nav .post-nav-item.post-nav-next .post-nav-info{padding-left:6em}.post-nav .post-nav-item.post-nav-prev{right:0;text-align:right}.post-nav .post-nav-item.post-nav-prev .post-nav-icon{float:right}.post-nav .post-nav-item.post-nav-prev .post-nav-icon i{right:-.05em}.post-nav .post-nav-item.post-nav-prev .post-nav-info{padding-right:6em}.post-nav .post-nav-item .post-nav-teaser{display:block;padding:1em;transition:all ease-out .2s;max-width:25em;overflow:visible}.post-nav .post-nav-item .post-nav-teaser:after{clear:both;content:'';display:table}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon{display:block;width:5em;height:5em;line-height:5em;text-align:center;box-sizing:border-box;border-radius:10em;border:1px solid #36D995;box-shadow:0 0 0 0 transparent;transition:all ease-out .1s;background:#F2F3F5}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon i{position:relative;font-size:2em}@media only screen and (max-width:30em){.post-nav .post-nav-item .post-nav-teaser .post-nav-icon{width:4em;height:4em;line-height:4em}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon i{font-size:1.5em}}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon i:before{margin:auto}.post-nav .post-nav-item .post-nav-teaser .post-nav-info{display:none;width:100%;transition:all ease-out .2s}.post-nav .post-nav-item .post-nav-teaser .post-nav-info .post-nav-title{display:block;max-height:1.25em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:1.25em 0 .25em;font-size:1em;line-height:1.25em;font-weight:700;color:#363740}.post-nav .post-nav-item .post-nav-teaser .post-nav-info .post-nav-excerpt{display:block;max-height:1.334em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0;font-size:.75em;line-height:1.334em;font-weight:400;color:#9D9FA6}
+</style>
+
+
+    </head>
+    <body class="home-template" style="display: none;">
+      <section id="wrapper">
+        <div id="ajax-container">
+          <nav id="nav" class="nav">
+            <div class="nav-logo">
+              <a href="http://ticki.github.io/">
+      			  	
+      			  	
+      			  	<img src="/logo.png" alt="Logo"/>
+      			  	
+              </a>
+			  	    
+            </div>
+            <div class="nav-menu">
+              <a class="rss" href="">
+                <i class="icon-rss"></i>
+              </a>
+                
+                <a class="menu" data-action="toc" data-target="toc"><i class="icon-location"></i></a>
+                
+                
+                <a class="menu" data-action="menu" data-target="menu"><i class="icon-menu"></i></a>
+                
+            </div>
+          </nav>
+
+
+<main class="content" role="main">
+	<article class="post">
+		<div class="inner">
+
+			<div id="push">
+
+  			<header class="post-header">
+  				<span class="post-meta">
+						<span class="post-date">17 Sep 2016</span> <span class="reading-time">| <span class="estimated-reading-time">10 min.</span> (<span class="word-count">2035</span> words)</span></span>
+  				</span>
+  				<div class="clear"></div>
+  				<h1 class="post-title">Skip Lists: Done Right</h1>
+  			</header>
+
+  			<section class="post-content">
+  				
+
+<p><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.6.0/katex.min.css"></p>
+
+<h1 id="what-is-a-skip-list">What is a skip list?</h1>
+
+<p>In short, skip lists are a linked-list-like structure which allows for fast search. It consists of a base list holding the elements, together with a tower of lists maintaining a linked hierarchy of subsequences, each skipping over fewer elements.</p>
+
+<p>Skip list is a wonderful data structure, one of my personal favorites, but a trend in the past ten years has made them more and more uncommon as a single-threaded in-memory structure.</p>
+
+<p>My take is that this is because of how hard they are to get right. The simplicity can easily fool you into being too relaxed with respect to performance, and while they are simple, it is important to pay attention to the details.</p>
+
+<p>In the past five years, people have become increasingly sceptical of skip lists&rsquo; performance, due to their poor cache behavior when compared to e.g. B-trees, but fear not, a good implementation of skip lists can easily outperform B-trees while being implementable in only a couple of hundred lines.</p>
+
+<p>How? We will walk through a variety of techniques that can be used to achieve this speed-up.</p>
+
+<p>These are my thoughts on how a bad and a good implementation of skip list looks like.</p>
+
+<h2 id="advantages">Advantages</h2>
+
+<ul>
+<li>Skip lists perform very well on rapid insertions because there are no rotations or reallocations.</li>
+<li>They&rsquo;re simpler to implement than both self-balancing binary search trees and hash tables.</li>
+<li>You can retrieve the next element in constant time (compare to logarithmic time for inorder traversal for BSTs and linear time in hash tables).</li>
+<li>The algorithms can easily be modified to a more specialized structure (like segment or range &ldquo;trees&rdquo;, indexable skip lists, or keyed priority queues).</li>
+<li>Making it lockless is simple.</li>
+<li>It does well in persistent (slow) storage (often even better than AVL and EH).</li>
+</ul>
+
+<h1 id="a-naïve-but-common-implementation">A naïve (but common) implementation</h1>
+
+<p><img src="https://i.imgur.com/nNjOtfa.png" alt="Each shortcut has its own node." /></p>
+
+<p>Our skip list consists of (in this case, three) lists, stacked such that the <b style="font: 400 1.21em KaTeX_Math">n</b>&lsquo;th list visits a subset of the node the <b style="font: 400 1.21em KaTeX_Math">n - 1</b>&lsquo;th list does. This subset is defined by a probability distribution, which we will get back to later.</p>
+
+<p>If you rotate the skip list and remove duplicate edges, you can see how it resembles a binary search tree:</p>
+
+<p><img src="https://i.imgur.com/DO031ek.png" alt="A binary search tree." /></p>
+
+<p>Say I wanted to look up the node &ldquo;30&rdquo;, then I&rsquo;d perform normal binary search from the root and down. Due to duplicate nodes, we use the rule of going right if both children are equal:</p>
+
+<p><img src="https://i.imgur.com/H5KjvqC.png" alt="Searching the tree." /></p>
+
+<p>Self-balancing Binary Search Trees often have complex algorithms to keep the tree balanced, but skip lists are easier: They aren&rsquo;t trees, they&rsquo;re similar to trees in some ways, but they are not trees.</p>
+
+<p>Every node in the skip list is given a &ldquo;height&rdquo;, defined by the highest level containing the node (similarly, the number of decendants of a leaf containing the same value). As an example, in the above diagram, &ldquo;42&rdquo; has height 2, &ldquo;25&rdquo; has height 3, and &ldquo;11&rdquo; has height 1.</p>
+
+<p>When we insert, we assign the node a height, following the probability distribution:</p>
+
+<p><center style="font: 400 1.21em KaTeX_Math;font-style: italic;"> p(n) = 2<sup>1-n</sup> </center></p>
+
+<p>To obtain this distribution, we flip a coin until it hits tails, and count the flips:</p>
+
+<pre><code>uint generate_level() {
+    uint n = 0;
+    while coin_flip() {
+        n++;
+    }
+
+    return n;
+}
+</code></pre>
+
+<p>By this distribution, statistically the parent layer would contain half as many nodes, so searching is amortized <b style="font: 400 1.21em KaTeX_Main">O(log <i>n</i>) </b>.</p>
+
+<p>Note that we only have pointers to the right and below node, so insertion must be done while searching, that is, instead of searching and then inserting, we insert whenever we go a level down (pseudocode):</p>
+
+<pre><code>-- Recursive skip list insertion function.
+define insert(elem, root, height, level):
+    if right of root &lt; elem:
+        -- If right isn't &quot;overshot&quot; (i.e. we are going to long), we go right.
+        return insert(elem, right of root, height, level)
+    else:
+        if level = 0:
+            -- We're at bottom level and the right node is overshot, hence
+            -- we've reached our goal, so we insert the node inbetween root
+            -- and the node next to root.
+            old ← right of root
+            right of root ← elem
+            right of elem ← old
+        else:
+            if level ≤ height:
+                -- Our level is below the height, hence we need to insert a
+                -- link before we go on.
+                old ← right of root
+                right of root ← elem
+                right of elem ← old
+
+            -- Go a level down.
+            return insert(elem, below root, height, level - 1)
+</code></pre>
+
+<p>The above algorithm is recursive, but we can with relative ease turn it into an iterative form (or let tail-call optimization do the job for us).</p>
+
+<p>As an example, here&rsquo;s a diagram, the curved lines marks overshoots/edges where a new node is inserted:</p>
+
+<p><img src="https://i.imgur.com/jr9V8Ot.png" alt="An example" /></p>
+
+<h1 id="waste-waste-everywhere">Waste, waste everywhere</h1>
+
+<p>That seems fine doesn&rsquo;t it? No, not at all. It&rsquo;s absolute garbage.</p>
+
+<p>There is a total and complete waste of space going on. Let&rsquo;s assume there are <b style="font: 400 1.21em KaTeX_Math">n</b> elements, then the tallest node is approximately <b style="font: 400 1.21em KaTeX_Main"><i>h = </i>log<sub>2</sub> <i>n</i></b>, that gives us approximately <b style="font: 400 1.21em KaTeX_Main">1 + Σ<sub><i>k ←0..h</i></sub> <i></i>2<sup><i>-k</i></sup> n ≈ 2<i>n</i></b>.</p>
+
+<p><b style="font: 400 1.21em KaTeX_Math">2<i>n</i></b> is certainly no small amount, especially if you consider what each node contains, a pointer to the inner data, the node right and down, giving 5 pointers in total, so a single structure of <b style="font: 400 1.21em KaTeX_Math"><i>n</i></b> nodes consists of approximately <b style="font: 400 1.21em KaTeX_Math">6<i>n</i></b> pointers.</p>
+
+<p>But memory isn&rsquo;t even the main concern! When you need to follow a pointer on every decrease (apprx. 50% of all the links), possibly leading to cache misses. It turns out that there is a really simple fix for solving this:</p>
+
+<p>Instead of linking vertically, a good implementation should consist of a singly linked list, in which each node contains  an array (representing the nodes above) with pointers to later nodes:</p>
+
+<p><img src="https://i.imgur.com/Fd6gDLv.png" alt="A better skip list." /></p>
+
+<p>If you represent the links (&ldquo;shortcuts&rdquo;) through dynamic arrays, you will still often get cache miss. Particularly, you might get a cache miss on both the node itself (which is not data local) and/or the dynamic array. As such, I recommend using a fixed-size array (beware of the two negative downsides: 1. more space usage, 2. a hard limit on the highest level, and the implication of linear upperbound when <i style="font: 400 1.21em KaTeX_Math">h &gt; c</i>. Furthermore, you should keep small enough to fit a cache line.).</p>
+
+<p>Searching is done by following the top shortcuts as long as you don&rsquo;t overshoot your target, then you decrement the level and repeat, until you reach the lowest level and overshoot. Here&rsquo;s an example of searching for &ldquo;22&rdquo;:</p>
+
+<p><img src="https://i.imgur.com/cQsPnGa.png" alt="Searching for &quot;22&quot;." /></p>
+
+<p>In pseudocode:</p>
+
+<pre><code>define search(skip_list, needle):
+    -- Initialize to the first node at the highest level.
+    level ← max_level
+    current_node ← root of skip_list
+
+    loop:
+        -- Go right until we overshoot.
+        while level'th shortcut of current_node &lt; needle:
+            current_node ← level'th shortcut of current_node
+
+        if level = 0:
+            -- We hit our target.
+            return current_node
+        else:
+            -- Decrement the level.
+            level ← level - 1
+</code></pre>
+
+<h1 id="b-style-font-400-1-21em-katex-math-o-1-b-level-generation"><b style="font: 400 1.21em KaTeX_Math">O(1)</b> level generation</h1>
+
+<p>Even William Pugh did this mistake in <a href="http://epaperpress.com/sortsearch/download/skiplist.pdf">his original paper</a>. The problem lies in the way the level is generated: Repeating coin flips (calling the random number generator, and checking parity), can mean a couple of RNG state updates (approximately 2 on every insertion). If your RNG is a slow one (e.g. you need high security against DOS attacks), this is noticable.</p>
+
+<p>The output of the RNG is uniformly distributed, so you need to apply some function which can transform this into the desired distribution. My favorite is this one:</p>
+
+<pre><code>define generate_level():
+    -- First we apply some mask which makes sure that we don't get a level
+    -- above our desired level. Then we find the first set bit.
+    ffz(random() &amp; ((1 &lt;&lt; max_level) - 1))
+</code></pre>
+
+<p>This of course implies that you <code>max_level</code> is no higher than the bit width of the <code>random()</code> output. In practice, most RNGs return 32-bit or 64-bit integers, which means this shouldn&rsquo;t be a problem, unless you have more elements than there can be in your address space.</p>
+
+<h1 id="improving-cache-efficiency">Improving cache efficiency</h1>
+
+<p>A couple of techniques can be used to improve the cache efficiency:</p>
+
+<h2 id="memory-pools">Memory pools</h2>
+
+<p><img src="https://i.imgur.com/Wa8IVBJ.png" alt="A skip list in a memory pool." /></p>
+
+<p>Our nodes are simply fixed-size blocks, so we can keep them data local, with high allocation/deallocation performance, through linked memory pools (SLOBs), which is basically just a list of free objects.</p>
+
+<p>The order doesn&rsquo;t matter. Indeed, if we swap &ldquo;9&rdquo; and &ldquo;7&rdquo;, we can suddenly see that this is simply a skip list:</p>
+
+<p><img src="https://i.imgur.com/O863RR1.png" alt="It's true." /></p>
+
+<p>We can keep these together in some arbitrary number of (not necessarily consecutive) pages, drastically reducing cache misses, when the nodes are of smaller size.</p>
+
+<p>Since these are pointers into memory, and not indexes in an array, we need not reallocate on growth. We can simply extend the free list.</p>
+
+<h2 id="flat-arrays">Flat arrays</h2>
+
+<p>If we are interested in compactness and have a insertion/removal ratio near to 1, a variant of linked memory pools can be used: We can store the skip list in a flat array, such that we have indexes into said array instead of pointers.</p>
+
+<h2 id="unrolled-lists">Unrolled lists</h2>
+
+<p>Unrolled lists means that instead of linking each element, you link some number of fixed-size chuncks contains two or more elements (often the chunk is around 64 bytes, i.e. the normal cache line size).</p>
+
+<p>Unrolling is essential for a good cache performance. Depending on the size of the objects you store, unrolling can reduce cache misses when following links while searching by 50-80%.</p>
+
+<p>Here&rsquo;s an example of an unrolled skip list:</p>
+
+<p><img src="https://i.imgur.com/FYpPQPh.png" alt="A simple 4 layer unrolled skip list." /></p>
+
+<p>The gray box marks excessive space in the chunk, i.e. where new elements can be placed. Searching is done over the skip list, and when a candidate is found, the chunk is searched through <strong>linear</strong> search. To insert, you push to the chunk (i.e. replace the first free space). If no excessive space is available, the insertion happens in the skip list itself.</p>
+
+<p>Note that these algorithms requires information about how we found the chunk. Hence we store a &ldquo;back look&rdquo;, an array of the last node visited, for each level. We can then backtrack if we couldn&rsquo;t fit the element into the chunk.</p>
+
+<p>We effectively reduce cache misses by some factor depending on the size of the object you store. This is due to fewer links need to be followed before the goal is reached.</p>
+
+<h1 id="self-balancing-skip-lists">Self-balancing skip lists</h1>
+
+<p>Various techniques can be used to improve the height generation, to give a better distribution. In other words, we make the level generator aware of our nodes, instead of purely random, independent RNGs.</p>
+
+<h2 id="self-correcting-skip-list">Self-correcting skip list</h2>
+
+<p>The simplest way to achieve a content-aware level generator is to keep track of the number of node of each level in the skip list. If we assume there are <b style="font: 400 1.21em KaTeX_Math"><i>n</i></b> nodes, the expected number of nodes with level <b style="font: 400 1.21em KaTeX_Math"><i>l</i></b> is <b style="font: 400 1.21em KaTeX_Main">2<sup><i>-l</i></sup><i>n</i></b>. Subtracting this from actual number gives us a measure of how well-balanced each height is:</p>
+
+<p><img src="http://i.imgur.com/bBf7kcg.png" alt="Balance" /></p>
+
+<p>When we generate a new node&rsquo;s level, you choose one of the heights with the biggest under-representation (see the black line in the diagram), either randomly or by some fixed rule (e.g. the highest or the lowest).</p>
+
+<h2 id="perfectly-balanced-skip-lists">Perfectly balanced skip lists</h2>
+
+<p>Perfect balancing often ends up hurting performance, due to backwards level changes, but it is possible. The basic idea is to reduce the most over-represented level when removing elements.</p>
+
+<h1 id="an-extra-remark">An extra remark</h1>
+
+<p>Skip lists are wonderful as an alternative to Distributed Hash Tables. Performance is mostly about the same, but skip lists are more DoS resistant if you make sure that all links are F2F.</p>
+
+<p>Each node represents a node in the network. Instead of having a head node and a nil node, we connect the ends, so any machine can search starting at it self:</p>
+
+<p><img src="https://i.imgur.com/moD7oy9.png" alt="A network organized as a skip list." /></p>
+
+<p>If you want a secure open system, the trick is that any node can invite a node, giving it a level equal to or lower than the level itself. If the node control the key space in the interval of A to B, we partition it into two and transfer all KV pairs in the second part to the new node. Obviously, this approach has no privilege escalation, so you can&rsquo;t initialize a sybil attack easily.</p>
+
+<h1 id="conclusion-and-final-words">Conclusion and final words</h1>
+
+<p>By apply a lot of small, subtle tricks, we can drastically improve performance of skip lists, providing a simpler and faster alternative to Binary Search Trees. Many of these are really just minor tweaks, but give an absolutely enormous speed-up.</p>
+
+<p>The diagrams were made with <a href="https://en.wikipedia.org/wiki/Dia_(software)">Dia</a> and <a href="https://en.wikipedia.org/wiki/PGF/TikZ">TikZ</a>.</p>
+
+  			</section>
+
+  			<footer class="post-footer">
+  				<div class="post-tags">
+            
+            
+                <a href="http://ticki.github.io//tags/data-structures/">data-structures</a>
+            
+                <a href="http://ticki.github.io//tags/optimizations/">optimizations</a>
+            
+                <a href="http://ticki.github.io//tags/algorithms/">algorithms</a>
+            
+                <a href="http://ticki.github.io//tags/skip-lists/">skip-lists</a>
+            
+                <a href="http://ticki.github.io//tags/programming/">programming</a>
+            
+            
+  				</div>
+  				<div class="post-share">
+  					<a class="icon-twitter" href="https://twitter.com/share?text=Skip%20Lists%3a%20Done%20Right&url=http%3a%2f%2fticki.github.io%2fblog%2fskip-lists-done-right%2f" onclick="window.open(this.href, 'twitter-share', 'width=550,height=235');return false;">
+  						<span>Twitter</span>
+  					</a>
+  					<a class="icon-facebook" href="https://www.facebook.com/sharer/sharer.php?u=http%3a%2f%2fticki.github.io%2fblog%2fskip-lists-done-right%2f" onclick="window.open(this.href, 'facebook-share','width=580,height=296');return false;">
+  						<span>Facebook</span>
+  					</a>
+  					<a class="icon-gplus" href="https://plus.google.com/share?url=http%3a%2f%2fticki.github.io%2fblog%2fskip-lists-done-right%2f" onclick="window.open(this.href, 'google-plus-share', 'width=490,height=530');return false;">
+  						<span>Google+</span>
+  					</a>
+  				</div>
+  			</footer>
+
+  			<aside class="post-comments">
+    
+    
+    <div id="disqus_thread"></div>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+    
+</aside>
+
+
+			</div>
+
+			<nav class="post-nav">
+				
+					<a class="post-nav-item post-nav-next" href="http://ticki.github.io/blog/a-hoare-logic-for-rust/">
+						<section class="post-nav-teaser">
+							<span class="post-nav-icon"><i class="icon-arrow-left"></i></span>
+							<span class="post-nav-info">
+								<h4 class="post-nav-title">A Hoare Logic for Rust</h4>
+								<p class="post-nav-excerpt">In this post, I introduce a Hoare logic specifically for the Rust MIR.&hellip;</p>
+							</span>
+						</section>
+					</a>
+				
+				
+					<a class="post-nav-item post-nav-prev" href="http://ticki.github.io/blog/fantastic/">
+						<section class="post-nav-teaser">
+							<span class="post-nav-icon"><i class="icon-arrow-right"></i></span>
+							<span class="post-nav-info">
+								<h4 class="post-nav-title">Why Rust&#39;s `std::collections` is absolutely fantastic</h4>
+								<p class="post-nav-excerpt">Now that we&#39;ve seen the bad stuff of `std::collections`, we&#39;re going to look into all the good stuff and various techniques used to optimize and improve the collections&hellip;</p>
+							</span>
+						</section>
+					</a>
+				
+				<div class="clear"></div>
+			</nav>
+
+		</div>
+	</article>
+</main>
+
+				<div id="body-class" style="display: none;"></div>
+				<footer id="footer">
+					<section class="credits">
+						<span class="credits-theme">Theme <a href="https://github.com/zenithar/hugo-theme-bleak" target="_blank" rel="nofollow">Bleak</a> by <a href="http://zutrinken.com" target="_blank" rel="nofollow">zutrinken</a></span>
+						<span class="credits-software">Published with <a href="http://gohugo.io" target="_blank" rel="nofollow">Hugo</a></span>
+					</section>
+				</footer>
+				
+<div id="menu" data-target="menu">
+    <div class="menu-header">
+        <span class="menu-label">Menu</span>
+        <a class="menu-close" data-action="menu" data-target="menu"></a>
+    </div>
+
+    <div class="menu-list">
+        
+        
+        <li class="menu-list-item">
+            
+            <a class="home current js-ajax-link" href="/about/">About</a>
+        </li>
+        
+        
+        <li class="menu-list-item">
+            
+            <a class="home current js-ajax-link" href="https://github.com/ticki">GitHub</a>
+        </li>
+        
+    </div>
+
+</div>
+
+				
+<div id="tocMenu" data-target="toc">
+    <div class="menu-header">
+        <span class="menu-label">Menu</span>
+        <a class="menu-close" data-action="toc" data-target="toc"></a>
+    </div>
+    <div id="toc" class="menu-list">
+        <nav id="TableOfContents">
+<ul>
+<li><a href="#what-is-a-skip-list">What is a skip list?</a>
+<ul>
+<li><a href="#advantages">Advantages</a></li>
+</ul></li>
+<li><a href="#a-naïve-but-common-implementation">A naïve (but common) implementation</a></li>
+<li><a href="#waste-waste-everywhere">Waste, waste everywhere</a></li>
+<li><a href="#b-style-font-400-1-21em-katex-math-o-1-b-level-generation"><b style="font: 400 1.21em KaTeX_Math">O(1)</b> level generation</a></li>
+<li><a href="#improving-cache-efficiency">Improving cache efficiency</a>
+<ul>
+<li><a href="#memory-pools">Memory pools</a></li>
+<li><a href="#flat-arrays">Flat arrays</a></li>
+<li><a href="#unrolled-lists">Unrolled lists</a></li>
+</ul></li>
+<li><a href="#self-balancing-skip-lists">Self-balancing skip lists</a>
+<ul>
+<li><a href="#self-correcting-skip-list">Self-correcting skip list</a></li>
+<li><a href="#perfectly-balanced-skip-lists">Perfectly balanced skip lists</a></li>
+</ul></li>
+<li><a href="#an-extra-remark">An extra remark</a></li>
+<li><a href="#conclusion-and-final-words">Conclusion and final words</a></li>
+</ul>
+</nav>
+    </div>
+</div>
+
+
+				<div class="overlay"></div>
+			</div>
+		</section>
+
+    <script>
+      (function(c,f){asyncLoader=function(i,h){i.foreach(function(k,j){e(j,d(j),h)});if(typeof h.callback=="function"){var g=setInterval(function(){if(f.readyState==="complete"){clearInterval(g);h.callback()}},10)}};var d=function(g){var h=g.split(".");return h[h.length-1]},e=function(h,i,g){switch(i){case"js":a(h,g);break;case"css":b(h);break;default:break}},a=function(i,h){var g=document.createElement("script");g.type="text/javascript";g.async=true;g.src=i;document.getElementsByTagName("head")[0].appendChild(g)},b=function(g){var h=document.createElement("link");h.type="text/css";h.rel="stylesheet";h.href=g;document.getElementsByTagName("head")[0].appendChild(h)};Array.prototype.foreach=function(h){for(var g=0;g<this.length;g++){h(g,this[g])}}})(this,document);
+
+      asyncLoader([
+				"/js/dependencies.js",
+				"/css/dependencies.css"
+      ],{
+        callback:function(){
+					asyncLoader([
+						"/css/style.css",
+						"/js/script.js"
+					], {
+						callback: function() {
+							$('body').fadeIn( 800 );
+						}
+					});
+        }
+      });
+
+</script>
+
+
+
+</body>
+</html>
+

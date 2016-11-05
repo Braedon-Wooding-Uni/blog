@@ -1,0 +1,711 @@
+
+<!DOCTYPE html>
+<html lang="en-us">
+
+    <head>
+
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+        <meta property="og:title" content=" A Hoare Logic for Rust &middot;  Ticki&#39;s blog" />
+        <meta property="og:site_name" content="Ticki&#39;s blog" />
+        <meta property="og:url" content="http://ticki.github.io/blog/a-hoare-logic-for-rust/" />
+
+    
+        <meta property="og:type" content="article" />
+        <meta property="og:article:published_time" content="2016-09-24T00:00:00Z" />
+        <meta property="og:article:tag" content="mathematics" />
+        <meta property="og:article:tag" content="rust" />
+        <meta property="og:article:tag" content="theory" />
+        <meta property="og:article:tag" content="static-analysis" />
+        <meta property="og:article:tag" content="formal-verification" />
+        <meta property="og:article:tag" content="mind-dump" />
+        
+
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:site" content="@ticki_" />
+        <meta name="twitter:creator" content="@ticki_" />
+        <meta name="twitter:title" content="A Hoare Logic for Rust" />
+        <meta name="twitter:description" content="In this post, I introduce a Hoare logic specifically for the Rust MIR." />
+        <meta name="twitter:url" content="http://ticki.github.io/blog/a-hoare-logic-for-rust/" />
+    
+
+        <title> A Hoare Logic for Rust &middot;  Ticki&#39;s blog</title>
+
+    
+        <meta name="description" content="In this post, I introduce a Hoare logic specifically for the Rust MIR." />
+    
+
+        <meta name="p:domain_verify" content="fc173d84e3a4de948ed4bda2908afd3e"/>
+        <meta name="HandheldFriendly" content="True" />
+        <meta name="MobileOptimized" content="320" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        
+        
+
+    
+        <link href="http://ticki.github.io/index.xml" rel="alternate" type="application/rss+xml" title="Ticki&#39;s blog" />
+    
+
+    
+        <link rel="canonical" href="http://ticki.github.io/blog/a-hoare-logic-for-rust/" />
+
+    
+    <script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "Article",
+        "headline": "A Hoare Logic for Rust",
+        "author": {
+            "@type": "Person",
+            "name": "http://profiles.google.com/?rel=author"
+        },
+        "datePublished": "2016-09-24",
+        "description": "In this post, I introduce a Hoare logic specifically for the Rust MIR.",
+        "wordCount":  3397 
+    }
+
+    </script>
+
+    <script type="text/javascript">
+    
+    
+      var disqus_shortname = 'http-ticki-github-io';
+      var disqus_identifier = 'http:\/\/ticki.github.io\/blog\/a-hoare-logic-for-rust\/';
+      var disqus_title = 'A Hoare Logic for Rust';
+      var disqus_url = 'http:\/\/ticki.github.io\/blog\/a-hoare-logic-for-rust\/';
+    
+
+    </script>
+    
+
+    <style>
+@charset "UTF-8";article,header,img,main,nav,section{display:block}blockquote,p,pre,ul{margin:2em auto}#wrapper,pre{width:100%;box-sizing:border-box}#nav,#wrapper,code{position:relative}#nav,body{background:#fff}#menu,blockquote,pre code{background:0 0}#menu,#menu .menu-header,#menu .menu-list,#wrapper,.post-nav .post-nav-item .post-nav-teaser .post-nav-info,blockquote,pre{box-sizing:border-box}img{border:0;max-width:100%;height:auto;margin:2.5em auto}html{font-family:sans-serif;-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%}code,pre{font-family:monospace,monospace;font-size:1em}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:300;src:local("Merriweather Sans Light"),local("MerriweatherSans-Light"),url(//fonts.gstatic.com/s/merriweathersans/v5/6LmGj5dOJopQKEkt88GowY_zIojJi0m4a5Z6tRh6itY.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:400;src:local("Merriweather Sans Regular"),local("MerriweatherSans-Regular"),url(//fonts.gstatic.com/s/merriweathersans/v5/AKu1CjQ4qnV8MUltkAX3sL2aU247V0zTzydO4RoO9Ok.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:700;src:local("Merriweather Sans Bold"),local("MerriweatherSans-Bold"),url(//fonts.gstatic.com/s/merriweathersans/v5/6LmGj5dOJopQKEkt88GowQfd-b-I5PxxcmB4_-MNcqw.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:800;src:local("Merriweather Sans ExtraBold"),local("MerriweatherSans-ExtraBold"),url(//fonts.gstatic.com/s/merriweathersans/v5/6LmGj5dOJopQKEkt88GowWT7sFQ1Iz1BbpcuCPlgc9Q.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:italic;font-weight:300;src:local("Merriweather Sans Light Italic"),local("MerriweatherSans-LightItalic"),url(//fonts.gstatic.com/s/merriweathersans/v5/nAqt4hiqwq3tzCecpgPmVX9UU5BmOJGkLxUCVv5VXdc.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:italic;font-weight:400;src:local("Merriweather Sans Italic"),local("MerriweatherSans-Italic"),url(//fonts.gstatic.com/s/merriweathersans/v5/3Mz4hOHzs2npRMG3B1ascf0KIgDhPIHb_R-SWdtqte8.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:italic;font-weight:700;src:local("Merriweather Sans Bold Italic"),local("MerriweatherSans-BoldItalic"),url(//fonts.gstatic.com/s/merriweathersans/v5/nAqt4hiqwq3tzCecpgPmVYM8pfYvjMoOxygpzLVILAs.woff) format("woff")}@font-face{font-family:Inconsolata;font-style:normal;font-weight:400;src:local("Inconsolata"),url(//fonts.gstatic.com/s/inconsolata/v12/BjAYBlHtW3CJxDcjzrnZCIbN6UDyHWBl620a-IRfuBk.woff) format("woff")}@font-face{font-family:Inconsolata;font-style:normal;font-weight:700;src:local("Inconsolata Bold"),local("Inconsolata-Bold"),url(//fonts.gstatic.com/s/inconsolata/v12/AIed271kqQlcIRSOnQH0yTqR_3kx9_hJXbbyU8S6IN0.woff) format("woff")}@font-face{font-family:icons;src:url(/fonts/icons.eot?9273991);src:url(/fonts/icons.eot?9273991#iefix) format("embedded-opentype"),url(/fonts/icons.woff?9273991) format("woff"),url(/fonts/icons.ttf?9273991) format("truetype"),url(/fonts/icons.svg?9273991#icons) format("svg");font-weight:400;font-style:normal}[class^=icon-]:before{font-family:icons;font-style:normal;font-weight:400;speak:none;display:inline-block;text-decoration:inherit;width:1em;margin-right:.2em;text-align:center;font-variant:normal;text-transform:none;line-height:1em;margin-left:.2em;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}.icon-arrow-left:before{content:'\e804'}.icon-arrow-right:before{content:'\e807'}.icon-rss:before{content:'\e808'}.icon-menu:before{content:'\e809'}body{margin:0;font:300 1em/1.5em 'Merriweather Sans',sans-serif;color:#595B66}blockquote,i{font-style:italic}code,pre{font-family:Inconsolata,monospace}a,blockquote,code,i{font-weight:400}::-moz-selection{color:#222;background:#D6EDFF;text-shadow:none}::-moz-selection,::selection{color:#222;background:#D6EDFF;text-shadow:none}a{background-color:transparent;color:inherit;text-decoration:none;transition:all ease-out .2s}.post-content a{border-bottom:2px solid #36D995}h1,h4{text-rendering:optimizeLegibility;color:#1F2026}h1{font-size:2em;line-height:1em;margin:2em 0 -.5em}h4{font-size:1.25em;line-height:1.2em;margin:2.4em 0 -.8em}ul{list-style:none;padding-left:3em}blockquote{padding:0 1em;border-left:.25em solid #D4D5D9;color:#595B66}blockquote *{margin:1em auto}blockquote :first-child{margin-top:0}blockquote :last-child{margin-bottom:0}i{color:#363740}code{display:inline-block;top:-1px;padding:3px 6px;margin:-1px 2px;font-size:.875em;line-height:1.143em;background:#E1E2E6;color:#000;border-radius:2px}pre{padding:1em;white-space:pre;overflow:auto;background:#9D9FA6;color:#fff}pre code{position:static;top:auto;font-size:1em;line-height:1.5em;white-space:-moz-pre-wrap;white-space:pre-wrap;vertical-align:inherit;border:none;padding:0}#menu .menu-header:before,.post .post-title:before{border-bottom:4px solid #36D995;content:''}.inner{max-width:48em;margin:0 auto;padding:0 1em}#wrapper{min-height:100vh;padding-bottom:6em;background:#F2F3F5}#push{-webkit-transform:translate3d(0,0,0);transform:translate3d(0,0,0);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;opacity:1}#nav{z-index:70;transition:all ease-out .4s;-webkit-transform:translate3d(0,0,0);transform:translate3d(0,0,0);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;opacity:1}#nav:after{clear:both;content:'';display:table}#nav .nav-logo{float:left;height:2em;padding:1em;max-width:50%}#nav .nav-logo img{width:auto;max-width:none;height:2em;margin:0}#nav .nav-menu{float:right}#nav .nav-menu:after{clear:both;content:'';display:table}#nav .nav-menu a{display:block;width:1em;height:1em;line-height:1em;padding:1.5em;text-align:center;float:left;cursor:pointer}#nav .nav-menu a i:before{margin:auto}#menu{display:none;position:fixed;left:50%;top:5%;width:30em;height:90%;margin-left:-15em;padding:3em 0 0;overflow:hidden;transition:all ease-out .3s;-webkit-transform:translate3d(0,2em,0);transform:translate3d(0,2em,0);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;opacity:0;z-index:100}@media only screen and (max-width:50em){#menu{width:90%;left:5%;margin-left:auto}}#menu .menu-header{position:absolute;left:0;top:0;width:100%;height:3.5em;padding:1em 1.5em .5em;margin-bottom:1em;line-height:2em;z-index:110;background:#fff}#menu .menu-header:before{position:absolute;left:-5%;bottom:-1em;width:110%;height:2em;background:#fff;box-shadow:0 .125em .125em rgba(0,0,0,.1);-webkit-transform:rotate(2.5deg);transform:rotate(2.5deg);transition:all ease-out .2s;z-index:115}#menu .menu-header:after{clear:both;content:'';display:table}#menu .menu-header .menu-label{position:relative;display:block;float:left;z-index:120}#menu .menu-header .menu-close{position:relative;display:block;float:right;width:2em;height:2em;padding:1em;margin:-1em -1.5em -1em 0;cursor:pointer;z-index:125}#menu .menu-header .menu-close:after,#menu .menu-header .menu-close:before{content:'';position:absolute;left:50%;top:50%;background:#9D9FA6;-webkit-transform:rotate(45deg);transform:rotate(45deg)}.overlay,.overlay:before{top:0;width:100%;height:100%}#menu .menu-header .menu-close:after{width:2px;height:1em;margin:-.5em 0 0 -1px}#menu .menu-header .menu-close:before{width:1em;height:2px;margin:-1px 0 0 -.5em}#menu .menu-list{position:relative;list-style:none;margin:0;padding:2em 0;height:100%;overflow-x:hidden;overflow-y:scroll;background:#fff}.overlay{position:fixed;left:0;z-index:80;display:none}.overlay:before{content:'';position:absolute;left:0;background:#1F2026;opacity:0;transition:all ease-out .3s;-webkit-transform-style:preserve-3d;transform-style:preserve-3d}.post{position:relative;z-index:20}.post .post-meta{display:block;font-size:.75em;line-height:1.334em;font-weight:400;margin-bottom:1.334em}.post .post-title{position:relative;color:#000;font-size:2em;line-height:1.375em;font-weight:800;text-indent:-1px;margin:.25em 0 .75em}.post .post-title:before{position:absolute;left:0;bottom:-.334em;width:1em;margin-bottom:-2px}.post .post-header{padding:4em 0 0;margin-bottom:3em}.post-footer .post-share a span{display:none}.post-nav .post-nav-item{position:fixed;top:50%;display:block;margin-top:-4em;overflow:hidden;border-radius:10em;transition:none}@media only screen and (max-width:70em){.post-nav .post-nav-item{position:absolute;top:auto;margin:auto;max-width:50%}}.post-nav .post-nav-item.post-nav-next{left:0;text-align:left}.post-nav .post-nav-item.post-nav-next .post-nav-icon{float:left}.post-nav .post-nav-item.post-nav-next .post-nav-icon i{left:-.05em}.post-nav .post-nav-item.post-nav-next .post-nav-info{padding-left:6em}.post-nav .post-nav-item.post-nav-prev{right:0;text-align:right}.post-nav .post-nav-item.post-nav-prev .post-nav-icon{float:right}.post-nav .post-nav-item.post-nav-prev .post-nav-icon i{right:-.05em}.post-nav .post-nav-item.post-nav-prev .post-nav-info{padding-right:6em}.post-nav .post-nav-item .post-nav-teaser{display:block;padding:1em;transition:all ease-out .2s;max-width:25em;overflow:visible}.post-nav .post-nav-item .post-nav-teaser:after{clear:both;content:'';display:table}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon{display:block;width:5em;height:5em;line-height:5em;text-align:center;box-sizing:border-box;border-radius:10em;border:1px solid #36D995;box-shadow:0 0 0 0 transparent;transition:all ease-out .1s;background:#F2F3F5}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon i{position:relative;font-size:2em}@media only screen and (max-width:30em){.post-nav .post-nav-item .post-nav-teaser .post-nav-icon{width:4em;height:4em;line-height:4em}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon i{font-size:1.5em}}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon i:before{margin:auto}.post-nav .post-nav-item .post-nav-teaser .post-nav-info{display:none;width:100%;transition:all ease-out .2s}.post-nav .post-nav-item .post-nav-teaser .post-nav-info .post-nav-title{display:block;max-height:1.25em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:1.25em 0 .25em;font-size:1em;line-height:1.25em;font-weight:700;color:#363740}.post-nav .post-nav-item .post-nav-teaser .post-nav-info .post-nav-excerpt{display:block;max-height:1.334em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0;font-size:.75em;line-height:1.334em;font-weight:400;color:#9D9FA6}
+</style>
+
+
+    </head>
+    <body class="home-template" style="display: none;">
+      <section id="wrapper">
+        <div id="ajax-container">
+          <nav id="nav" class="nav">
+            <div class="nav-logo">
+              <a href="http://ticki.github.io/">
+      			  	
+      			  	
+      			  	<img src="/logo.png" alt="Logo"/>
+      			  	
+              </a>
+			  	    
+            </div>
+            <div class="nav-menu">
+              <a class="rss" href="">
+                <i class="icon-rss"></i>
+              </a>
+                
+                <a class="menu" data-action="toc" data-target="toc"><i class="icon-location"></i></a>
+                
+                
+                <a class="menu" data-action="menu" data-target="menu"><i class="icon-menu"></i></a>
+                
+            </div>
+          </nav>
+
+
+<main class="content" role="main">
+	<article class="post">
+		<div class="inner">
+
+			<div id="push">
+
+  			<header class="post-header">
+  				<span class="post-meta">
+						<span class="post-date">24 Sep 2016</span> <span class="reading-time">| <span class="estimated-reading-time">16 min.</span> (<span class="word-count">3397</span> words)</span></span>
+  				</span>
+  				<div class="clear"></div>
+  				<h1 class="post-title">A Hoare Logic for Rust</h1>
+  			</header>
+
+  			<section class="post-content">
+  				<script type="text/javascript"
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+<p>Lately, I've been working on a Hoare-logic-based model of the Rust MIR, which I will introduce in the post. This is a minor step towards a memory model of Rust, and it allows formalization of programs and their behavior.</p>
+
+<p>This project was born out of the effort to formalize <a href="https://github.com/redox-os/redox">the Redox kernel</a> and <a href="https://github.com/redox-os/ralloc/tree/skiplist">the ralloc memory allocator</a> as well as coming up with a <a href="https://github.com/rust-lang/rfcs/issues/1447">Rust memory model</a>.</p>
+
+<p>Here I will walk through the techniques, axioms, and transformations in detail. I've divided this post into three parts:</p>
+
+<ol>
+<li>An introduction to Hoare logic: An gentle introduction for the beginners (can be skipped if you're already familiar with Hoare logic).</li>
+<li>Applying Hoare logic to the Rust MIR: Notably dropping structured programming in favour of a lower-level goto-based representation, and how it helps simplifying certain things.</li>
+<li>Reasoning about pointers: Pointers are notoriously hard to reason about. Here we try to formalize their behavior and give various insight on how they can be reasoned about. Priory to this part, we assume that pointers doesn't exist.</li>
+</ol>
+
+<p>This blog post is not a formal specification or a paper, but rather a mere introduction to the subject and proposed axioms.</p>
+
+<p><em>If the math doesn't show up properly, reload the page.</em></p>
+
+<h1 id="an-introduction-to-hoare-logic">An introduction to Hoare logic</h1>
+
+<p>So, what is Hoare logic? Well, it's a set of axioms and inference rules allowing one to reason about <em>imperative programs</em> in a rigorous manner.</p>
+
+<p>The program is divided into so called <strong>Hoare triples</strong>, denoted <span  class="math">\(\{P\} \ S \ \{Q\}\)</span>. <span  class="math">\(P\)</span> is called the &quot;precondition&quot;. Informally, if <span  class="math">\(P\)</span> is satisfied, then after <span  class="math">\(S\)</span> (the statement or instruction) has been executed, <span  class="math">\(Q\)</span> (the postcondition) should be true. In other words, <span  class="math">\(P\)</span> is true before <span  class="math">\(S\)</span>, and <span  class="math">\(Q\)</span> should be true after.</p>
+
+<p>In fact, we can view <span  class="math">\(S\)</span> as a function on the state space, going from <span  class="math">\(\sigma\)</span> satisfying property <span  class="math">\(P(\sigma)\)</span> to a state <span  class="math">\(S(\sigma) = \sigma'\)</span> satisfying the postcondition, <span  class="math">\(Q(\sigma')\)</span>.</p>
+
+<p>Thus a Hoare triple can be seen as a 3-tuple</p>
+
+<p><span  class="math">\[(P, f, Q)\]</span></p>
+
+<p>satisfying:</p>
+
+<p><span  class="math">\[P(\sigma) \to Q(f(\sigma))\]</span></p>
+
+<p>It turns out that this interpretation is a strong one, and we will use it throughout the post to derive the Hoare rules, some of which follows directly from this interpretation.</p>
+
+<p><span  class="math">\[\frac{\forall \sigma.P(\sigma) \to Q(f(\sigma))}{\{P\}\ f\ \{Q\}} \qquad \frac{\{P\}\ f\ \{Q\}}{\forall \sigma.P(\sigma) \to Q(f(\sigma))}\]</span></p>
+
+<p>(on a side note, this notation should be understood as: what is below the line is true if what is above is true)</p>
+
+<h2 id="an-example">An example</h2>
+
+<p>Suppose we have the program,</p>
+
+<pre><code class="language-rust">// a = 4
+a += 2;
+// a = 6
+</code></pre>
+
+<p>This is expressed by the Hoare triple</p>
+
+<p><span  class="math">\[\{a = 4\} \ a \gets a + 2 \ \{a = 6\}\]</span></p>
+
+<p>So far, we have only introduced the notation, which in itself is worthless, what's really the core is the rules that allows us to reason about valid Hoare triples. We need a way to essentially construct new Hoare triples from old ones.</p>
+
+<h2 id="rules-and-axioms">Rules and axioms</h2>
+
+<h3 id="empty-statement-rule">Empty statement rule</h3>
+
+<p>The empty statement rule states that: Let <span  class="math">\(S\)</span> be any statement which carries no side-effect, then <span  class="math">\(\{P\} \ S \ \{P\}\)</span>, or in inference line notation:</p>
+
+<p><span  class="math">\[\frac{S \text{ is pure}}{\{P\} \ S \ \{P\}}\]</span></p>
+
+<p>This rule is relatively simple: If the state is not changed, the invariants are neither. Note that this is only true for effect-less statements, since the statement could otherwise change variables or in other ways invalidate the postcondition.</p>
+
+<p>In fact, we can express it in terms of the identity function, <span  class="math">\(f(x)=x\)</span>. Then,</p>
+
+<p><span  class="math">\[P(x) \to P(f(x)) = P(x)\]</span></p>
+
+<p>Hence, the triple is valid.</p>
+
+<h3 id="composition-rule">Composition rule</h3>
+
+<p>The composition rule allows you to concatenate two statements (into a Hoare triple) if the first statement's postcondition is equal to the second statement's precondition:</p>
+
+<p><span  class="math">\[\frac{\{P\}\ S\ \{Q\}, \quad \{Q\}\ T\ \{R\}}{\{P\}\ S;T\ \{R\}}\]</span></p>
+
+<p>It is left as an exercise for the reader to verify the correctness of the rule above.</p>
+
+<h3 id="strengthening-and-weakening-conditions">Strengthening and weakening conditions</h3>
+
+<p><span  class="math">\[\frac{P_1 \to P_2,\quad \{P_2\}\ S\ \{Q_2\},\quad Q_2 \to Q_1}{\{P_1\}\ S\ \{Q_1\}}\]</span></p>
+
+<p>So, what's going on here? Well, <span  class="math">\(P_1\)</span> implies <span  class="math">\(P_2\)</span>, so we can replace the precondition by a stronger version which implies the old one. The same cannot be applied to postcondition, because the strengthened precondition might not yield the strengthened postcondition after the statement. We can however replace it by a weaker postcondition (i.e. one which is implied by original postcondition).</p>
+
+<p>We can always weaken guarantees, but never assumptions, since the assumption is what the guarantee relies on. Assumptions can be made stronger, however.</p>
+
+<p>It is left as an exercise for the reader to verify the correctness of the rule above.</p>
+
+<h3 id="the-assignment-axiom">The assignment axiom</h3>
+
+<p>This axiom is the most important. It allows for reasoning about preconditions in the case of assignments. It is absolutely essential to Hoare logic.</p>
+
+<p><span  class="math">\[\frac{}{\{P[x \gets E]\}\ x \gets E\ \{P\}}\]</span></p>
+
+<p><span  class="math">\(P[x \gets E]\)</span> denotes replacing every free (unbound) <span  class="math">\(x\)</span> with <span  class="math">\(E\)</span>.</p>
+
+<p>Let's say <span  class="math">\(P\)</span> involves some assertion about <span  class="math">\(x\)</span>, then we can move it over the assignment (to the precondition) replacing <span  class="math">\(x\)</span> with the right-hand-side of the assignment, because every occurence of <span  class="math">\(x\)</span> represents said value anyway, so substituting the value <span  class="math">\(x\)</span> represents for <span  class="math">\(x\)</span> won't change the structure.</p>
+
+<p>Let's say we have the statement, <span  class="math">\(x \gets x + 2\)</span>, with the postcondition <span  class="math">\(\{x = 6\}\)</span>, we can then derive the Hoare triple:</p>
+
+<p><span  class="math">\[\{x + 2 = 6\}\ x \gets x + 2\ \{x = 6\}\]</span></p>
+
+<p>One thing that is surprising, but also incredibly important, is that you substitute it into the precondition and not the postcondition. To see why such a rule (<span  class="math">\(\{P\}\ x \gets E\ \{P[x \gets E]\}\)</span>) would be wrong, observe how you could derive <span  class="math">\(\{x = 1\}\ x \gets 2\ \{2 = 1\}\)</span>, which is clearly false.</p>
+
+<p>It is also worth noting that, in this context, expressions cannot carry side-effects. We'll cover this in detail in part two.</p>
+
+<h3 id="conditional-rule">Conditional rule</h3>
+
+<p>So far, we have only covered a simple language without loops, conditionals, and other forms of branches.</p>
+
+<p>The first (and simplest) form of branches is a conditional non-cyclic branch (<code>if</code>). These behaves in a very simple way:</p>
+
+<p><span  class="math">\[\frac{\{C \land P\}\ B\ \{Q\},\quad \{\neg C \land P\}\ E\ \{Q\}}{\{P\}\ \textbf{if } C \textbf{ then } B \textbf{ else } E \textbf{ end}\ \{Q\}}\]</span></p>
+
+<p>As complex this looks, it's actually relatively simple:</p>
+
+<ol>
+<li>In your <code>if</code> statement's body, you can safely assume the <code>if</code> condition to be true.</li>
+<li>If both branches shares their postcondition (<span  class="math">\(Q\)</span>), then the <code>if</code> statement does as well.</li>
+</ol>
+
+<p>As an example, consider the code,</p>
+
+<pre><code class="language-rust">if x == 4 {
+    // I can safely assume that x = 4 here.
+    ...
+    x = 2;
+    // Now x = 2.
+} else {
+    // I can safely assume that x ≠ 4 here.
+    ...
+    x = 2;
+    // Now x = 2.
+}
+// All branches share postcondition, so the whole if-statement does as well: x = 2
+</code></pre>
+
+<h3 id="the-loop-rule">The loop rule</h3>
+
+<p>The loop rule reads,</p>
+
+<p><span  class="math">\[\frac{\{I \land C\}\ B\ \{I\}}{\{I\}\ \textbf{while } C \textbf{ do } B \textbf{ done}\ \{I \land \neg C\}}\]</span></p>
+
+<p><span  class="math">\(I\)</span> is called the <em>loop invariant</em>, i.e. the condition which is true before and after the loop. The loop will terminate when <span  class="math">\(\neg C\)</span>, hence the postcondition of the loop.</p>
+
+<p>As a simple example, take the following code:</p>
+
+<pre><code class="language-rust">let mut x = 3;
+let mut y = 4;
+// Precondition: x == 3 (loop invariant)
+while y &lt; 100 {
+    // Precondition: y &lt; 100 &amp;&amp; x == 3
+    y += 1;
+    // Posttcondition: x == 3 (loop invariant)
+}
+// Postcondition: !(y &lt; 100) ⇒ y &gt;= 100
+</code></pre>
+
+<h1 id="applying-hoare-logic-to-the-mir">Applying Hoare logic to the MIR</h1>
+
+<p>The Rust MIR is in many ways an interesting language. It can be seen as an extremely stripped-down version of Rust. What we'll work with is the MIR from the last compiler pass.</p>
+
+<h2 id="the-rust-mir">The Rust MIR</h2>
+
+<p>The Rust MIR has no structural control flow. It directly resembles the CFG of the program.</p>
+
+<p>There are three concepts we must be familiar with to understand the Rust MIR:</p>
+
+<ol>
+<li><strong>Functions</strong>: A graph.</li>
+<li><strong>Basic blocks</strong>: The nodes in the graph.</li>
+<li><strong>Terminators</strong>: The edges in the graph.</li>
+</ol>
+
+<p>We'll not get into the representation of scopes and type information the MIR contains.</p>
+
+<h3 id="functions">Functions</h3>
+
+<p>Taking aside the type information, functions have two components: A set of variables and a Control Flow Graph.</p>
+
+<p>The function starts with a bunch of variable declarations (arguments, temporaries, and variables). There's one implicit variable, the <code>return</code> variable, which contains the return values.</p>
+
+<p>Secondly, there's a set of basic blocks, as well as a starting block.</p>
+
+<h3 id="basic-blocks">Basic blocks</h3>
+
+<p>Basic blocks are the nodes of the CFG. They each represent a series of statements. In our model, we can wlog. assume that a statement is simply an assignment, <span  class="math">\(x \gets y\)</span>, where <span  class="math">\(y\)</span> is an operand. In other words, a basic block is of the form <span  class="math">\((x_1 \gets y_1; x_2 \gets y_2; \ldots; x_n \gets y_n, t)\)</span> with <span  class="math">\(t\)</span> being the terminator.</p>
+
+<p>In fact, we can go even further: A statement is a single assignment. This can be shown by simply constructing a map between the two graphs (by using the goto terminator to chain).</p>
+
+<p>Note that there are two kinds of assignments. Up until now, we have only considered the <em>simple assignment</em> <span  class="math">\(x \gets y\)</span> with <span  class="math">\(y\)</span> being a simple, effectless expression. There's actually a second form of assignment, the function call assignment, <span  class="math">\(x \gets f(y)\)</span>.</p>
+
+<p>In such an assignment, the function can change the state of the program, and thus care must be taken, since you cannot always use the assignment axiom. We'll get back to that later on.</p>
+
+<h3 id="terminators">Terminators</h3>
+
+<p>Terminators are what binds basic blocks together. Every basic block has an associated terminator, which takes one of the following forms:</p>
+
+<ol>
+<li>Return from the current function: <span  class="math">\(\textbf{return}\)</span>. The return value is stored in the <code>return</code> variable.</li>
+<li>Calling a diverging function (&quot;transferring&quot; to the function), <span  class="math">\(f(x)\)</span>.</li>
+<li>Non-conditionally jumping to another block <span  class="math">\(\textbf{goto}(b)\)</span>.</li>
+<li>Jumping to another block if a condition is true, <span  class="math">\(\textbf{if}_c(b_1, b_2)\)</span>.</li>
+</ol>
+
+<p>(there is a few - in the implementation - we ignore in our model for simplification purposes)</p>
+
+<p>Notice how none of these are structural. All are based around gotos. Not only does this simplify our analysis, but it's also more near to the machine representation.</p>
+
+<p>As an example, let's write a program that finds the 10th Fibonacci number:</p>
+
+<p><figure><img src="https://i.imgur.com/gk6b2ZQ.png" alt="Tenth Fibonacci number"></figure></p>
+
+<p>First of all, the program starts by assigning starting values. Then it enters a loop with a conditional branch in the end (is 10 reached yet?). In this loop we do the classic, add the two numbers and shift one down. When the loops ends, we assign the return value, and then return from the function.</p>
+
+<h2 id="reasoning-about-the-mir">Reasoning about the MIR</h2>
+
+<h3 id="unconditional-gotos">Unconditional gotos</h3>
+
+<p>The first rule is the non-structural equivalent of the composition rule. All it says is that for a goto-statement to be valid, the precondition of the target basic block must be true:</p>
+
+<p><span  class="math">\[\frac{\{P\}\ b_1\ \{Q\}, \quad \{Q\}\ b_2\ \{R\}}{\{P\}\ b_1; \textbf{goto}(b_2)\ \{R\}}\]</span></p>
+
+<h3 id="conditional-gotos">Conditional gotos</h3>
+
+<p>Conditional gotos are interesting in that it allows us to reason about both while-loops and if-statements in only run rule.</p>
+
+<p><span  class="math">\[\frac{\{P \land C\}\ b_1\ \{Q\},\quad \{P \land \neg C\}\ b_2\ \{Q\}}{\{P\}\ \textbf{if}_C(b_1, b_2)\ \{Q\}}\]</span></p>
+
+<p>It is the non-structural equivalent of the conditional rule, we described earlier.</p>
+
+<h3 id="function-calls">Function calls</h3>
+
+<p>Functions take the form <span  class="math">\(f(x) \stackrel{\text{def}}{=} \{P(x)\}\ b\ \{Q(x)\}\)</span>, i.e. an initial starting block, <span  class="math">\(b\)</span>, and a precondition and postcondition, respectively.</p>
+
+<p>The rule of correctness for function calls reads,</p>
+
+<p><span  class="math">\[\frac{f(x) = \{P(x)\}\ b\ \{Q(x, \textbf{return})\}}{\{P(y) \land R[x \gets f(y)]\}\ x \gets f(y)\ \{Q(y, x) \land R\}}\]</span></p>
+
+<p>This one is a big one. Let's break it up:</p>
+
+<ul>
+<li>The assumption (above the inference line) states that <span  class="math">\(f(x)\)</span> is a Hoare triple with the precondition and postcondition being terms depending on the argument.</li>
+<li>The postcondition depends on the return value of <span  class="math">\(f(x)\)</span> as well.</li>
+<li>The conclusion (below the inference line) consists of a Hoare triple with an assignment to <span  class="math">\(x\)</span>.</li>
+<li>The postcondition of the assignment is <span  class="math">\(Q(y, x)\)</span> which express that the return value of the function is assigned to <span  class="math">\(x\)</span>, and the argument is <span  class="math">\(y\)</span>. This is logically joined with <span  class="math">\(R\)</span>, which is carried over to the other side:</li>
+<li>The precondition consists of <span  class="math">\(R[x \gets f(y)]\)</span>, in a similar manner to the assignment axiom, as well as <span  class="math">\(P(y)\)</span>, the precondition of the function.</li>
+</ul>
+
+<p>Note that this rule will be modified later when we introduce pointers into our model.</p>
+
+<p>Take this imaginary program:</p>
+
+<pre><code class="language-rust">fn subtract_without_overflow(a: u32, b: u32) -&gt; u32 {
+    // Precondition: b ≤ a
+    a - b
+    // Postcondition: return ≤ a
+}
+
+fn main() {
+    let mut n = 0;
+    let mut res;
+    while n &lt; 10 {
+        res = subtract_without_overflow(10, n);
+        // Postcondition: res &lt; 10 (this is what we're going to prove!)
+        n += 1;
+    }
+}
+</code></pre>
+
+<p>We know here that the condition for the loop is <span  class="math">\(x < 10\)</span>, as such we set:</p>
+
+<p><span  class="math">\[\begin{align*}
+x &= \mathtt{res}\\
+y &= (10, n)\\
+R &= [\mathtt{res} < 10]\\
+P((a, b)) &= [b \leq a]\\
+Q((a, b), r) &= [r \leq a]
+\end{align*}\]</span></p>
+
+<p>Plug it all in, and get:</p>
+
+<p><span  class="math">\[\frac{f(a, b) = \{n \leq a\}\ S\ \{f(a, b) \leq a\}}{\{n \leq 10 \land f(10, n) < 10\}\ x \gets f(10, n)\ \{f(10, n) \leq 10 \land \mathtt{res} < 10\}}\]</span></p>
+
+<p>The desired result is obtained: the precondition implies that <span  class="math">\(n < 10\)</span>, which is also the loop condition.</p>
+
+<!--  -->
+
+<p>Thus, we can conclude that there is no overflow in the program. Cool, no?</p>
+
+<h3 id="dont-repeat-yourself">Don't repeat yourself!</h3>
+
+<p>The rest of the rules are exactly matching the &quot;classical&quot; Hoare logic axioms. In other words, the assignment axiom, skip axiom, and consequence axiom remains unchanged.</p>
+
+<h1 id="reasoning-about-pointers">Reasoning about pointers</h1>
+
+<p>This is a tricky subject. Pointers are notorious for being hard to reason about. In fact, they are probably the single hardest subject in program verification.</p>
+
+<h2 id="approach-1-global-reasoning">Approach 1: Global reasoning</h2>
+
+<p>We could simply consider memory as one big array, in which pointers are indexes, but it turns out such a model is not only non-local, but also very messy, as such we need to derive a more expressive and convenient model to be able to reason about pointers without too much hassle.</p>
+
+<h2 id="approach-2-relational-alias-analysis">Approach 2: Relational alias analysis</h2>
+
+<p>To start with, I'll introduce a model I call &quot;relational alias analysis&quot;. We define an equivalence relation, <span  class="math">\(\sim\)</span>, on the set of variables. This equivalence relation tells if two variables are <em>aliased</em> (i.e. pointers to the same location).</p>
+
+<h3 id="aliasing-variables">Aliasing variables</h3>
+
+<p>The first axiom reads,</p>
+
+<p><span  class="math">\[\frac{\{x \sim y\}}{\{x = y\}}\]</span></p>
+
+<p>i.e. if two variables are aliased, they're equal.</p>
+
+<p>This is perhaps more of a definition than an axiom. None the less, it describes the semantics of our alias relation.</p>
+
+<p>Then we describe the behavior of alias asignments:</p>
+
+<p><span  class="math">\[\frac{}{\{A = \textbf{alias}(a)\}\ a \stackrel{\text{alias}}{\gets} b\ \{\textbf{alias}(a) = A \cup \{b\}\}}\]</span></p>
+
+<p>(<span  class="math">\(\textbf{alias}(x)\)</span> defines the equivalence class of <span  class="math">\(x\)</span> under <span  class="math">\(\sim\)</span>)</p>
+
+<p>This allows for declaring a variable to be aliased with another variable.</p>
+
+<h3 id="assignment-axiom-for-aliased-values">Assignment axiom for aliased values</h3>
+
+<p>Preconditions and postconditions can contain statements on the value behind the pointer, which has the unfortunate consequence that the old assignment axiom schema is no longer valid.</p>
+
+<p>In fact, we simply need to observe that previously, we had <span  class="math">\(\textbf{alias}(x) = \{x\}\)</span>. Now that we introduced aliased values, the situation changed, and the equivalence class can be arbitrarily large.</p>
+
+<p>We put,</p>
+
+<p><span  class="math">\[\frac{}{\{P[\textbf{alias}(x) \gets E]\}\ x \gets E\ \{P\}}\]</span></p>
+
+<p>Note that <span  class="math">\(P[A \gets E]\)</span> means that we replace every element <span  class="math">\(a \in A\)</span> with <span  class="math">\(E\)</span>.</p>
+
+<p>In other words, we do the same as before except that we assign the value to <em>all</em> the aliased variables.</p>
+
+<h3 id="insufficiency">Insufficiency</h3>
+
+<p>This model allows reasoning about aliases, but <em>not</em> pointers in general. In fact, it cannot reason about <code>noalias</code> pointers, deallocation, and pointer arithmetics.</p>
+
+<h2 id="approach-3-separation-logic">Approach 3: Separation logic</h2>
+
+<p>Separation logic was originally introduced by JC Reynolds in one of the most cited program verification papers ever. It is more complex than the alternative model we just presented, but also more expressive in some cases.</p>
+
+<h3 id="modeling-memory">Modeling memory</h3>
+
+<p>Our model of memory consists of multiple new notations. First of all, the model becomes memory aware. We use <span  class="math">\(p \mapsto x\)</span> to denote that some pointer, <span  class="math">\(p\)</span>, maps to the value <span  class="math">\(x\)</span>.</p>
+
+<p>We use the notation <span  class="math">\(\mathcal{H}(p)\)</span> to denote pointer reads. The reason we keep the notation function-like is because it is, in fact, just a function! It simply maps pointers to values. We can define,</p>
+
+<p><span  class="math">\[\frac{p \mapsto x}{\mathcal{H}(p) = x}\]</span></p>
+
+<p>We denote pointer writes by <span  class="math">\(p \stackrel{\text{ptr}}{\gets} x\)</span>.</p>
+
+<h4 id="disjointness">Disjointness</h4>
+
+<p>The first feature of separation logic is the notion of &quot;separate conjunction&quot;, denotes <span  class="math">\(P * Q\)</span>.</p>
+
+<p>This asserts that <span  class="math">\(P\)</span> and <span  class="math">\(Q\)</span> are both true and independent, i.e. their &quot;heaps&quot; are disjointed and not affected by the statement of the Hoare triple. In particular, let <span  class="math">\(A\)</span> be the domain of <span  class="math">\(\mathcal{H}\)</span>, then let <span  class="math">\(\{A_1, A_2\}\)</span> be some semipartition of <span  class="math">\(A\)</span> (<span  class="math">\(A_1 \cap A_2 = \emptyset\)</span>), then put <span  class="math">\(A_1 = \textbf{ref}(P)\)</span> and <span  class="math">\(A_b = \textbf{ref}(Q)\)</span> (<span  class="math">\(\textbf{ref}(P)\)</span> denotes all the locations that are referenced in <span  class="math">\(P\)</span>, e.g. <span  class="math">\(\textbf{ref}([\mathcal{H}(x) = 3]) = \{x\}\)</span>)</p>
+
+<p>We can then put <span  class="math">\(P * Q\)</span>. This might seem useless at first (how much different from <span  class="math">\(\land\)</span> is it?), but it is incredibly important: If <span  class="math">\(P\)</span> and <span  class="math">\(Q\)</span> are dependent, not by sharing a free variable, but instead share a variable through aliasing (say <span  class="math">\(P\)</span> has <span  class="math">\(x\)</span> free and <span  class="math">\(Q\)</span> has <span  class="math">\(y\)</span> free, and <span  class="math">\(x \sim y\)</span>).</p>
+
+<p>All this will be formally defined in the next subsection.</p>
+
+<h4 id="the-frame-rule">The frame rule</h4>
+
+<p>The frame rule is the most important component of separation logic. It reads,</p>
+
+<p><span  class="math">\[\frac{\textbf{mut}(C) \cap \textbf{free}(R) = \emptyset,\quad \{P\}\ C\ \{Q\}}{\{P * R\}\ C\ \{Q * R\}}\]</span></p>
+
+<p><span  class="math">\(\textbf{mut}(C)\)</span> means the set of variables <span  class="math">\(C\)</span> &quot;mutates&quot; (changes) when executed. For example, <span  class="math">\(\textbf{mut}(a \gets b) = \{a\}\)</span>.</p>
+
+<p>What the rule says is that if <span  class="math">\(C\)</span> never changes the &quot;environment&quot; from <span  class="math">\(R\)</span>, then you can safely join the precondition and postcondition with <span  class="math">\(R\)</span> of some Hoare triple with <span  class="math">\(C\)</span>.</p>
+
+<h3 id="the-behavior-of-byreference-assignments">The behavior of by-reference assignments</h3>
+
+<p>The next thing we need is a way to reason about assignments behind pointers, or &quot;pointer writes&quot;. We use the term &quot;by-reference assignments&quot; to signify the similarities between normal assignments.</p>
+
+<p>Starting by defining by-reference assignment, we add a rule allowing us to write to valid pointers:</p>
+
+<p><span  class="math">\[\frac{}{\{P * p \mapsto \bullet\}\ p \stackrel{\text{ptr}}{\gets} x\ \{P * p \mapsto x\}}\]</span></p>
+
+<p>Next, we need to specify the semantics of <em>reading</em> from a pointer:</p>
+
+<p><span  class="math">\[\frac{\{P \land p \mapsto x\}\ k \gets \mathcal{H}(p)\ \{Q\}}{\{P \land p \mapsto x\}\ k \gets x\ \{Q\}}\]</span></p>
+
+<p>In other words, writing the data read from a pointer to a variable is equivalent to writing the value it's pointing to. This is more of a definition than an actual rule, because it is obvious, ignoring the notation.</p>
+
+<h3 id="allocation">Allocation</h3>
+
+<p>Allocation is what introduces a new heap store/pointer into the heap. And its behavior is relatively straight-forward:</p>
+
+<p><span  class="math">\[\frac{p \notin \textbf{free}(P)}{\{P\}\ p \gets \textbf{alloc}(s)\ \{P * p \to \bullet\}}\]</span></p>
+
+<p>Namely, if <span  class="math">\(p\)</span> is not contained in <span  class="math">\(P\)</span>, allocation creates a new, separate pointer. <span  class="math">\(\bullet\)</span> denotes that the pointer is uninitialized or the value is unknown.</p>
+
+<h3 id="deallocation">Deallocation</h3>
+
+<p>As an example, take the dealloc function. This function obviously requires that there is no usage of the pointer later on (i.e. no use-after-free). We can express this in a relatively simple way:</p>
+
+<p><span  class="math">\[\frac{}{\{P * p \mapsto x\}\ \textbf{dealloc}(p)\ \{P\}}\]</span></p>
+
+<p>The <span  class="math">\(*\)</span> here express the independence of the content and validity of the pointer <span  class="math">\(p\)</span>, which is really where separation logic shines: We can express pointer relation, and in this case, make sure that there is no usage of <span  class="math">\(p\)</span> after the free.</p>
+
+<h3 id="pointers-on-the-stack">Pointers on the stack</h3>
+
+<p>In a formal model, the stack and the heap are not semantically different. In fact, we can interpret function calls as allocating the arguments onto the heap and deallocating them again when returning.</p>
+
+<h3 id="detecting-memory-leaks">Detecting memory leaks</h3>
+
+<p>In this model, it is surprisingly easy to prove your program leak-free. You simply have to put that the heap is empty in the postcondition and propagate it forward.</p>
+
+<h2 id="future-work-and-whats-next">Future work and what's next</h2>
+
+<p>Currently, I am writing a theorem extractor, which will generate the statement of correctness for some arbitrary program. This can then be fed into SMT solver and shown to be true.</p>
+
+<p>Another aspect is the compilation itself, which must be a verified process, as such I am working on a compiler and formal proof of correctness of said compiler.</p>
+
+<p>Lastly, I can formally verify Ralloc and Redox.</p>
+
+<h2 id="conclusion-and-final-words">Conclusion and final words</h2>
+
+<p>We have seen how a modest set of rules can create an elegant way to reason about the complex behavior of programs. Rust already has a very interesting form of static analysis, but it is decidable and much simpler, as a result, there is a lot of things it can not reason about, like raw pointers. We need a more advanced model (like the one we proposed in this post) to reason about such things.</p>
+
+  			</section>
+
+  			<footer class="post-footer">
+  				<div class="post-tags">
+            
+            
+                <a href="http://ticki.github.io//tags/mathematics/">mathematics</a>
+            
+                <a href="http://ticki.github.io//tags/rust/">rust</a>
+            
+                <a href="http://ticki.github.io//tags/theory/">theory</a>
+            
+                <a href="http://ticki.github.io//tags/static-analysis/">static-analysis</a>
+            
+                <a href="http://ticki.github.io//tags/formal-verification/">formal-verification</a>
+            
+                <a href="http://ticki.github.io//tags/mind-dump/">mind-dump</a>
+            
+            
+  				</div>
+  				<div class="post-share">
+  					<a class="icon-twitter" href="https://twitter.com/share?text=A%20Hoare%20Logic%20for%20Rust&url=http%3a%2f%2fticki.github.io%2fblog%2fa-hoare-logic-for-rust%2f" onclick="window.open(this.href, 'twitter-share', 'width=550,height=235');return false;">
+  						<span>Twitter</span>
+  					</a>
+  					<a class="icon-facebook" href="https://www.facebook.com/sharer/sharer.php?u=http%3a%2f%2fticki.github.io%2fblog%2fa-hoare-logic-for-rust%2f" onclick="window.open(this.href, 'facebook-share','width=580,height=296');return false;">
+  						<span>Facebook</span>
+  					</a>
+  					<a class="icon-gplus" href="https://plus.google.com/share?url=http%3a%2f%2fticki.github.io%2fblog%2fa-hoare-logic-for-rust%2f" onclick="window.open(this.href, 'google-plus-share', 'width=490,height=530');return false;">
+  						<span>Google+</span>
+  					</a>
+  				</div>
+  			</footer>
+
+  			<aside class="post-comments">
+    
+    
+    <div id="disqus_thread"></div>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+    
+</aside>
+
+
+			</div>
+
+			<nav class="post-nav">
+				
+					<a class="post-nav-item post-nav-next" href="http://ticki.github.io/blog/making-terminal-applications-in-rust-with-termion/">
+						<section class="post-nav-teaser">
+							<span class="post-nav-icon"><i class="icon-arrow-left"></i></span>
+							<span class="post-nav-info">
+								<h4 class="post-nav-title">Making Terminal Applications in Rust with Termion</h4>
+								<p class="post-nav-excerpt">This post will explain how to make terminal applications in Rust for new beginners.&hellip;</p>
+							</span>
+						</section>
+					</a>
+				
+				
+					<a class="post-nav-item post-nav-prev" href="http://ticki.github.io/blog/skip-lists-done-right/">
+						<section class="post-nav-teaser">
+							<span class="post-nav-icon"><i class="icon-arrow-right"></i></span>
+							<span class="post-nav-info">
+								<h4 class="post-nav-title">Skip Lists: Done Right</h4>
+								<p class="post-nav-excerpt">    Skip lists are a wonderful data structure, but it is hard to get\
+    right. This blog post presents various techniques to optimize and\
+    improve the implementation of skip lists.
+&hellip;</p>
+							</span>
+						</section>
+					</a>
+				
+				<div class="clear"></div>
+			</nav>
+
+		</div>
+	</article>
+</main>
+
+				<div id="body-class" style="display: none;"></div>
+				<footer id="footer">
+					<section class="credits">
+						<span class="credits-theme">Theme <a href="https://github.com/zenithar/hugo-theme-bleak" target="_blank" rel="nofollow">Bleak</a> by <a href="http://zutrinken.com" target="_blank" rel="nofollow">zutrinken</a></span>
+						<span class="credits-software">Published with <a href="http://gohugo.io" target="_blank" rel="nofollow">Hugo</a></span>
+					</section>
+				</footer>
+				
+<div id="menu" data-target="menu">
+    <div class="menu-header">
+        <span class="menu-label">Menu</span>
+        <a class="menu-close" data-action="menu" data-target="menu"></a>
+    </div>
+
+    <div class="menu-list">
+        
+        
+        <li class="menu-list-item">
+            
+            <a class="home current js-ajax-link" href="/about/">About</a>
+        </li>
+        
+        
+        <li class="menu-list-item">
+            
+            <a class="home current js-ajax-link" href="https://github.com/ticki">GitHub</a>
+        </li>
+        
+    </div>
+
+</div>
+
+				
+<div id="tocMenu" data-target="toc">
+    <div class="menu-header">
+        <span class="menu-label">Menu</span>
+        <a class="menu-close" data-action="toc" data-target="toc"></a>
+    </div>
+    <div id="toc" class="menu-list">
+        
+    </div>
+</div>
+
+
+				<div class="overlay"></div>
+			</div>
+		</section>
+
+    <script>
+      (function(c,f){asyncLoader=function(i,h){i.foreach(function(k,j){e(j,d(j),h)});if(typeof h.callback=="function"){var g=setInterval(function(){if(f.readyState==="complete"){clearInterval(g);h.callback()}},10)}};var d=function(g){var h=g.split(".");return h[h.length-1]},e=function(h,i,g){switch(i){case"js":a(h,g);break;case"css":b(h);break;default:break}},a=function(i,h){var g=document.createElement("script");g.type="text/javascript";g.async=true;g.src=i;document.getElementsByTagName("head")[0].appendChild(g)},b=function(g){var h=document.createElement("link");h.type="text/css";h.rel="stylesheet";h.href=g;document.getElementsByTagName("head")[0].appendChild(h)};Array.prototype.foreach=function(h){for(var g=0;g<this.length;g++){h(g,this[g])}}})(this,document);
+
+      asyncLoader([
+				"/js/dependencies.js",
+				"/css/dependencies.css"
+      ],{
+        callback:function(){
+					asyncLoader([
+						"/css/style.css",
+						"/js/script.js"
+					], {
+						callback: function() {
+							$('body').fadeIn( 800 );
+						}
+					});
+        }
+      });
+
+</script>
+
+
+
+</body>
+</html>
+

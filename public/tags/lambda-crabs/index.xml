@@ -1,0 +1,515 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Lambda Crabs on Ticki&#39;s blog</title>
+    <link>http://ticki.github.io/tags/lambda-crabs/</link>
+    <description>Recent content in Lambda Crabs on Ticki&#39;s blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Wed, 08 Jun 2016 11:24:24 +0200</lastBuildDate>
+    <atom:link href="http://ticki.github.io/tags/lambda-crabs/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Lambda crabs (part 3): Region-based alias analysis</title>
+      <link>http://ticki.github.io/blog/lambda_crabs_3/</link>
+      <pubDate>Wed, 08 Jun 2016 11:24:24 +0200</pubDate>
+      
+      <guid>http://ticki.github.io/blog/lambda_crabs_3/</guid>
+      <description>
+
+&lt;p&gt;In the &lt;a href=&#34;http://ticki.github.io/blog/lambda_crabs_2/&#34;&gt;last post&lt;/a&gt;, we saw how to
+infer regions and their span. In this post, we will cover aliasing and how to
+ensure guarantees through region analysis.&lt;/p&gt;
+
+&lt;h2 id=&#34;aliasing-mutable-aliasing-and-unsafety&#34;&gt;Aliasing, mutable aliasing, and unsafety.&lt;/h2&gt;
+
+&lt;p&gt;Two pointers are said to be &lt;em&gt;aliased&lt;/em&gt;, if they refer to the same object. Alias
+analysis is essential to program verification, optimizers, and compiler theory.&lt;/p&gt;
+
+&lt;p&gt;Alias analysis is the study of which pointers are aliased and, more
+importantly, which pointers &lt;em&gt;aren&amp;rsquo;t aliased&lt;/em&gt;.&lt;/p&gt;
+
+&lt;p&gt;Rust guarantees that no mutable reference is aliased. This is statically
+checked, and we will show how in this post.&lt;/p&gt;
+
+&lt;p&gt;So, why is aliasing guarantees even needed?&lt;/p&gt;
+
+&lt;p&gt;The answer is that I need to be able to reason about the invariants of the
+pointers content, while being sure that those aren&amp;rsquo;t broken in the period of
+accessibility.&lt;/p&gt;
+
+&lt;p&gt;Furthermore, we want strict thread-safety, which requires guarantees about
+shared mutable state.&lt;/p&gt;
+
+&lt;h2 id=&#34;different-values-different-namespaces&#34;&gt;Different values, different namespaces&lt;/h2&gt;
+
+&lt;p&gt;To reason about mutability overlaps and aliasing through regions, we need a
+notion of different namespaces.&lt;/p&gt;
+
+&lt;p&gt;For example, say some variable X is referenced in a lifetime &lt;code&gt;&#39;a&lt;/code&gt;. Does that
+mean another variable Y living in the same scope can&amp;rsquo;t be mutated?&lt;/p&gt;
+
+&lt;p&gt;Of course not! Let&amp;rsquo;s consider:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;{
+    let mut a = 2; // ------+ &#39;a
+    let b = &amp;amp;a;    // ----+ | &#39;b
+    let mut c = 0; // --+ | | &#39;c
+    c = 1;         //   | | |
+    c = 2;         //   | | |
+} // -------------------+-+-+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;As you can see &lt;code&gt;a&lt;/code&gt; is aliased, thus mutating it is not allowed. However, &lt;code&gt;&#39;a:
+&#39;c&lt;/code&gt;, but that doesn&amp;rsquo;t mean they refer to the same.&lt;/p&gt;
+
+&lt;p&gt;Holding a global namespace would make the above example fail, since it has no
+distinction between &lt;code&gt;a&lt;/code&gt; and &lt;code&gt;c&lt;/code&gt; and their respective lifetimes.&lt;/p&gt;
+
+&lt;p&gt;For that reason, we need to segregate the regions, such that we can effectively
+reason about aliasing without mixing values up.&lt;/p&gt;
+
+&lt;h2 id=&#34;sublattices&#34;&gt;Sublattices&lt;/h2&gt;
+
+&lt;p&gt;We talked a bit about lattices and their applications in the last part. I
+recommend reading that if you do not know what a lattice is.&lt;/p&gt;
+
+&lt;p&gt;Now, let&amp;rsquo;s introduce the notion of a &lt;em&gt;sublattice&lt;/em&gt;:&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;M&lt;/em&gt; is a sublattice of &lt;em&gt;L&lt;/em&gt;, if &lt;em&gt;M&lt;/em&gt; is a nonempty subset of &lt;em&gt;L&lt;/em&gt; forming a
+lattice under &lt;em&gt;L&lt;/em&gt;&amp;rsquo;s meet and join operators.&lt;/p&gt;
+
+&lt;p&gt;Take a lattice,&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;       Join(a, b, c)
+           /\
+          /  \
+         /    \
+   Join(a, b)  \c
+       /\      /
+      /  \    /
+     /    \  /
+   a/      \/b
+    \      /
+     \    /
+      \  /
+       \/
+    Meet(a, b)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;(by the way, this is why it is called a lattice)&lt;/p&gt;
+
+&lt;p&gt;then&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;   Join(a, b)
+       /\
+      /  \
+     /    \
+  a /      \b
+    \      /
+     \    /
+      \  /
+       \/
+    Meet(a, b)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;is a sublattice, since it holds all the conditions:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;It is a nonempty subset.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;It shares meet and join, while preserving closure (you can easily check this
+yourself).&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;region-classes&#34;&gt;Region classes&lt;/h2&gt;
+
+&lt;p&gt;Region classes has many names, but none which is universally agreed upon, I
+prefer the name region classes. As we say, a rose by any other name would still
+smell as sweet.&lt;/p&gt;
+
+&lt;p&gt;Let &lt;em&gt;L&lt;/em&gt; be our region lattice, define a &lt;em&gt;region class&lt;/em&gt; of &lt;em&gt;L&lt;/em&gt; as a sublattice
+of &lt;em&gt;L&lt;/em&gt;, in the context of segregating regions.&lt;/p&gt;
+
+&lt;p&gt;In particular, assign each value a region class. Say the value has the bounds
+(outlives) &lt;code&gt;{a, b, c, d...}&lt;/code&gt;, then we derive our region class as the cyclic
+sublattice, &lt;code&gt;&amp;lt;a, b, c, d...&amp;gt;&lt;/code&gt;. In particular, this means &lt;em&gt;the smallest
+extension which forms a sublattice of L&lt;/em&gt;.&lt;/p&gt;
+
+&lt;p&gt;The compiler keeps a log of the region class of every variable. This is then
+used for alias analysis:&lt;/p&gt;
+
+&lt;h2 id=&#34;pointers-and-references&#34;&gt;Pointers and references&lt;/h2&gt;
+
+&lt;p&gt;Taking an immutable reference extends our region class to contain the region of
+this particular reference, denoted &lt;code&gt;M[N]&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Mutable references, on the other hand, works slightly different. The region
+class and the region of the reference &lt;em&gt;must be disjoint&lt;/em&gt;, unless we get shared
+mutability. With this requirement satisfied, we can proceed to extend the
+region class with the new region.&lt;/p&gt;
+
+&lt;h2 id=&#34;mutating-a-local-variable&#34;&gt;Mutating a local variable&lt;/h2&gt;
+
+&lt;p&gt;You may ask, &amp;ldquo;Can you mutate a local variable while it is borrowed?&amp;rdquo;, the
+answer is, &amp;ldquo;No, you cannot&amp;rdquo;. The reason is the same for the mutable aliasing:
+it introduce shared mutable state.&lt;/p&gt;
+
+&lt;p&gt;But, how do we handle such mutations?&lt;/p&gt;
+
+&lt;p&gt;We introduced &lt;code&gt;empty(x)&lt;/code&gt;, the empty region at &lt;code&gt;x&lt;/code&gt;, in the earlier blog posts.
+And we can use this to interpret local mutations as well: as taking a mutable
+reference for region &lt;code&gt;empty(x)&lt;/code&gt; and simply mutate it through the reference.&lt;/p&gt;
+
+&lt;h2 id=&#34;applying-this-method&#34;&gt;Applying this method&lt;/h2&gt;
+
+&lt;p&gt;If we get back to our example,&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;{
+    let mut a = 2; // ------+ &#39;a
+    let b = &amp;amp;a;    // ----+ | &#39;b
+    let mut c = 0; // --+ | | &#39;c
+    c = 1;         //   | | |
+    c = 2;         //   | | |
+} // -------------------+-+-+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;We can see that the region class of &lt;code&gt;&#39;a&lt;/code&gt; is an extension of &lt;code&gt;&#39;b&lt;/code&gt;, but &lt;code&gt;&#39;c&lt;/code&gt; is
+not entangled with &lt;code&gt;&#39;a&lt;/code&gt;&amp;rsquo;s region class. In particular, &lt;code&gt;&#39;c&lt;/code&gt; and &lt;code&gt;&#39;a&lt;/code&gt; belong to
+different namespaces and thus, there is no shared mutability.&lt;/p&gt;
+
+&lt;h2 id=&#34;region-classes-and-their-relations&#34;&gt;Region classes and their relations&lt;/h2&gt;
+
+&lt;p&gt;A natural question that arise is: Why don&amp;rsquo;t we do region inference seperately
+for each region class?&lt;/p&gt;
+
+&lt;p&gt;The answer is that distinct region classes are far from unrelated. Each region
+class simply defines a value and its aliases, but that doesn&amp;rsquo;t make it isolated
+for the rest of &lt;em&gt;L&lt;/em&gt;.&lt;/p&gt;
+
+&lt;p&gt;If you look at our example above, you may notice that &lt;code&gt;&#39;a&lt;/code&gt; outlives &lt;code&gt;&#39;c&lt;/code&gt;,
+despite being associated with a different region class.&lt;/p&gt;
+
+&lt;h2 id=&#34;questions-and-errata&#34;&gt;Questions and errata&lt;/h2&gt;
+
+&lt;p&gt;Ping me at #rust in Mozilla IRC.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Lambda crabs (part 2): Region inference is (not) magic.</title>
+      <link>http://ticki.github.io/blog/lambda_crabs_2/</link>
+      <pubDate>Mon, 06 Jun 2016 11:06:21 +0200</pubDate>
+      
+      <guid>http://ticki.github.io/blog/lambda_crabs_2/</guid>
+      <description>
+
+&lt;p&gt;This post will cover region (lifetime) inference with a mathematical and type
+theoretical focus.&lt;/p&gt;
+
+&lt;h2 id=&#34;the-problem&#34;&gt;The problem&lt;/h2&gt;
+
+&lt;p&gt;Inference is a very handy concept. We no longer have to annotate redundant
+types, which is a major pain point in languages, that lacks of type inference.&lt;/p&gt;
+
+&lt;p&gt;Now, we want such an inference scheme for regions as well.&lt;/p&gt;
+
+&lt;p&gt;We described the problem of region inference in &lt;a href=&#34;http://ticki.github.io/blog/lambda_crabs_1/&#34;&gt;last post&lt;/a&gt; as:&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;So, this is just a classical optimization problem:&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;pre&gt;&lt;code&gt;  minimize    &#39;a
+  subject to  A, B, C...
+
+  A, B, C… are outlives relations. ‘a may or may not be free in those.
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Namely, we want to minimize some lifetimes, while holding some conditions.&lt;/p&gt;
+
+&lt;h2 id=&#34;adding-regions&#34;&gt;&amp;ldquo;Adding&amp;rdquo; regions&lt;/h2&gt;
+
+&lt;p&gt;One thing we will use throughout the region inference algorithm is the notion of &amp;ldquo;adding&amp;rdquo; regions.&lt;/p&gt;
+
+&lt;p&gt;You may have seen &lt;code&gt;&#39;a + &#39;b&lt;/code&gt; before. Intuitively, &lt;code&gt;&#39;a: &#39;b + &#39;c&lt;/code&gt; is equivalent to
+&lt;code&gt;&#39;a: &#39;b, &#39;a: &#39;c&lt;/code&gt;, but we can go further and use &lt;code&gt;&#39;a + &#39;b&lt;/code&gt; as a way to construct
+new regions:&lt;/p&gt;
+
+&lt;p&gt;Define &lt;code&gt;&#39;a + &#39;b&lt;/code&gt; as the smallest region that outlives both &lt;code&gt;&#39;a&lt;/code&gt; and &lt;code&gt;&#39;b&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;In a sense, you &amp;ldquo;widen&amp;rdquo; the region until it covers both regions:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&#39;a:       I---------I
+&#39;b:            I------------I
+&#39;a + &#39;b:  I-----------------I
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;funky-but-useless-regions-under-addition-as-an-abelian-semigroup&#34;&gt;Funky but useless: Regions under addition as an abelian semigroup&lt;/h2&gt;
+
+&lt;p&gt;A semigroup is an algebraic structure satisfying two properties:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Closure, for any a, b in S, a + b is contained in S.&lt;/li&gt;
+&lt;li&gt;Associativity, for any a, b, and c in S, (a + b) + c = a + (b + c).&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;But in contrary to monoids, there is no identity element.&lt;/p&gt;
+
+&lt;p&gt;&amp;ldquo;Abelian&amp;rdquo; means commutative. That is, a + b = b + a.&lt;/p&gt;
+
+&lt;p&gt;And, in fact, regions follows all these rules, making it an abelian semigroup.&lt;/p&gt;
+
+&lt;p&gt;We know two additional facts about our operator:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;It follows from the fact &lt;code&gt;&#39;a: &#39;a&lt;/code&gt;, that a + a = a&lt;/li&gt;
+&lt;li&gt;It follows from the fact &lt;code&gt;&#39;static: &#39;a&lt;/code&gt; for all &lt;code&gt;&#39;a&lt;/code&gt;, that &lt;code&gt;∃s∈L  ∀a∈L  s + a = s&lt;/code&gt;.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;regions-as-a-lattice&#34;&gt;Regions as a lattice&lt;/h2&gt;
+
+&lt;p&gt;It makes much more sense to think of regions as a lattice. A lattice is a poset
+with two operators defined on it:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;Join, an unique supremum (that is, least upper-bound). This is our &lt;code&gt;+&lt;/code&gt;
+operator.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Meet, an unique infimum (that is, greatest lower-bound). This isn&amp;rsquo;t very
+useful for the matter of regions, but it is still defined on them.&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;which follows a set of laws:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;The law of commutativity: Both meet and join are commutative operators.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;The law of associativity: Both meet and join are associative operators.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;The law of absorption: Meet(a, Meet(a, b)) = Meet(a, b) and Join(a, Join(a, b)) = Join(a, b).&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;In fact, this describes our structure perfectly. In particular, L is an
+&lt;em&gt;upper-bounded lattice&lt;/em&gt;, i.e. we have a maximal element (&lt;code&gt;&#39;static&lt;/code&gt;).&lt;/p&gt;
+
+&lt;p&gt;Lattice theory, which we will cover in-depth in a later post is perfect for
+studying subtyping relations.&lt;/p&gt;
+
+&lt;h2 id=&#34;directed-acyclic-graphs&#34;&gt;Directed Acyclic Graphs&lt;/h2&gt;
+
+&lt;p&gt;A directed acyclic graph is a finite directed graph with no directed cycles.
+That is, any arbitrary directed walk in the graph will &amp;ldquo;end&amp;rdquo; at some point.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://upload.wikimedia.org/wikipedia/commons/6/61/Polytree.svg&#34; alt=&#34;&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s forget the &lt;code&gt;&#39;a: &#39;a&lt;/code&gt; case for a moment. As such, the regions under our
+&lt;em&gt;strict&lt;/em&gt; outlive relation, &lt;em&gt;&amp;lt;&lt;/em&gt;, forms a directed acyclic graph (DAG).&lt;/p&gt;
+
+&lt;p&gt;In particular, if two node are connected, with a directed edge A → B, A
+represents a region, which &lt;em&gt;outlives&lt;/em&gt; B.&lt;/p&gt;
+
+&lt;p&gt;Consider we take a reference &lt;code&gt;&amp;amp;&#39;b T&lt;/code&gt; where &lt;code&gt;T: &#39;a&lt;/code&gt;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt; &#39;static
+ |
+ v
+&#39;a &amp;lt;---------\
+ |           |
+ |           |
+ |           |
+ v           |
+&#39;b &amp;lt;------- &#39;a + &#39;b
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;handling-cycles&#34;&gt;Handling cycles&lt;/h2&gt;
+
+&lt;p&gt;Every lifetime outlives itself, as explained in the last post. So our outlives
+relation doesn&amp;rsquo;t form a DAG, due to these cycles.&lt;/p&gt;
+
+&lt;p&gt;The solution is relatively simple, though.&lt;/p&gt;
+
+&lt;p&gt;Let &lt;code&gt;{&#39;a, &#39;b, &#39;c, ...}&lt;/code&gt; be cycle such that &lt;code&gt;&#39;a &amp;lt; &#39;b &amp;lt; &#39;c ... &amp;lt; &#39;a&lt;/code&gt;. Due to
+transitivity and antisymmetry, we can assume that &lt;code&gt;&#39;a = &#39;b = &#39;c = ...&lt;/code&gt;, thus we
+can, without loss of generality, collapse the cycle into a single node.&lt;/p&gt;
+
+&lt;p&gt;This lets us interpret the graph, where edges represents outlives relations, as
+a DAG.&lt;/p&gt;
+
+&lt;h2 id=&#34;recursively-widening-the-regions&#34;&gt;Recursively widening the regions&lt;/h2&gt;
+
+&lt;p&gt;Say we want to infer the span of some node &lt;code&gt;&#39;a&lt;/code&gt;. Assume &lt;code&gt;&#39;a&lt;/code&gt; neighbors (outlives)
+&lt;code&gt;&#39;b, &#39;c, &#39;d...&lt;/code&gt;&lt;/p&gt;
+
+&lt;p&gt;Since we know the bound, we can say &lt;code&gt;&#39;a = &#39;b + &#39;c + &#39;d + ...&lt;/code&gt;, since this is the
+smallest &amp;lsquo;a subject to the outlives conditions.&lt;/p&gt;
+
+&lt;p&gt;Now, recursively do the same with &lt;code&gt;&#39;b, &#39;c, &#39;d, ...&lt;/code&gt; Since the graph is acyclic,
+this will terminate at some point.&lt;/p&gt;
+
+&lt;p&gt;On an implementation note: you can optimize this process by 1. deduplicating
+the regions, 2. collapsing sums containing &lt;code&gt;&#39;static&lt;/code&gt; into &lt;code&gt;&#39;static&lt;/code&gt;, 3. caching the
+nodes to avoid redundant calculations.&lt;/p&gt;
+
+&lt;h2 id=&#34;going-further-liveness&#34;&gt;Going further: liveness&lt;/h2&gt;
+
+&lt;p&gt;Now that we have a closed form for inferring lifetimes, we can do lots of cool stuff.&lt;/p&gt;
+
+&lt;p&gt;Liveness of a value is the span starting where the value is declared and ending
+where the last access to it is made. This is in contrary to the classical
+lexical approach, where the initial lifetimes are assigned as the scopes of the
+variables.&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s start by defining &lt;code&gt;empty(x)&lt;/code&gt; as the region spanning from x to x (that is,
+an empty region at x). Assign every value declared at x a region, &lt;code&gt;empty(x)&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Whenever a value of lifetime &lt;code&gt;&#39;x&lt;/code&gt; is used at some point y, we add a bound &lt;code&gt;&#39;x:
+empty(y)&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;So we essentially expand the region whenever used, effectively yielding the
+liveness of the value.&lt;/p&gt;
+
+&lt;h2 id=&#34;a-happy-ending&#34;&gt;A happy ending&lt;/h2&gt;
+
+&lt;p&gt;That&amp;rsquo;s it&amp;hellip; The algorithm is really that simple. In fact, you can implement it
+in only a 100-200 lines.&lt;/p&gt;
+
+&lt;h2 id=&#34;questions-and-errata&#34;&gt;Questions and errata&lt;/h2&gt;
+
+&lt;p&gt;Ping me at #rust in Mozilla IRC.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Lambda crabs (part 1): A mathematical introduction to lifetimes and regions</title>
+      <link>http://ticki.github.io/blog/lambda_crabs_1/</link>
+      <pubDate>Mon, 06 Jun 2016 09:12:56 +0200</pubDate>
+      
+      <guid>http://ticki.github.io/blog/lambda_crabs_1/</guid>
+      <description>
+
+&lt;p&gt;This post will cover lifetimes and regions in depth, with a focus on the mathematical background of regions. That is, what is a region? What rules do they follow? How does the compiler handle them? And how are they inferred?&lt;/p&gt;
+
+&lt;h2 id=&#34;regions-and-their-ordering&#34;&gt;Regions and their ordering&lt;/h2&gt;
+
+&lt;p&gt;So, let&amp;rsquo;s briefly investigate what a region is. A region (or in Rust lingo, a lifetime) is a span of some form, e.g. the token stream. Regions have an outlive relation defined on them.&lt;/p&gt;
+
+&lt;p&gt;A region &lt;code&gt;&#39;a&lt;/code&gt; outlives &lt;code&gt;&#39;b&lt;/code&gt; if &lt;code&gt;&#39;b&lt;/code&gt;&amp;rsquo;s span is covered by &lt;code&gt;&#39;a&lt;/code&gt;. For example:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&#39;a: I----------------I
+&#39;b: I---------I
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;As you can see &lt;code&gt;&#39;a: &#39;b&lt;/code&gt; since the first span covers the second. But what is the nature of the outlives relation?&lt;/p&gt;
+
+&lt;h2 id=&#34;regions-a-poset&#34;&gt;Regions: a poset&lt;/h2&gt;
+
+&lt;p&gt;One could mistakenly believe that regions are ordered over their outlives relation. An totally ordered set A under ≤ means that any elements a, b ∈ A satisfy all of the following statements:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;If a ≤ b and b ≤ a are both satisfied, a = b.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;If a ≤ b and b ≤ c are both satisfied, a ≤ c.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;At least one of a ≤ b and b ≤ a is true.&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;To see why the outlives relation is not a total order over the set of regions, consider the case:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&#39;a: I---------I
+&#39;b:    I------------I
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The third condition is not met here: neither &lt;code&gt;&#39;a: &#39;b&lt;/code&gt; or &lt;code&gt;&#39;b: &#39;a&lt;/code&gt; is true.&lt;/p&gt;
+
+&lt;p&gt;It turns out that weakening the last condition to only consider reflexivity gives us a structure, that L (the set of regions) classifies. Replace 3. by a ≤ a, and you get a partially ordered set, or a poset.&lt;/p&gt;
+
+&lt;h2 id=&#34;outlive-relation-as-a-partial-order&#34;&gt;Outlive relation as a partial order&lt;/h2&gt;
+
+&lt;p&gt;So, let&amp;rsquo;s briefly explain how the rules of outliving mirrors the rules of partial orders.&lt;/p&gt;
+
+&lt;p&gt;The first rule, the rule of antisymmetry, reads&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&#39;a: &#39;b
+&#39;b: &#39;a
+-------
+&#39;a = &#39;b
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So if two regions (lifetimes, borrows, scopes, etc.) outlives each other symmetrically (&amp;lsquo;a: &amp;lsquo;b and &amp;lsquo;b: &amp;lsquo;a), they are, in fact, the same.&lt;/p&gt;
+
+&lt;p&gt;The second rule, the rule of transitivity, is crucial to understanding the semantics of regions:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&#39;a: &#39;b
+&#39;b: &#39;c
+------
+&#39;a: &#39;c
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;In other words, regions are hierarchical. It might seem very simple, but the implications are in fact very important: it allows us to conclude things from transitivity. Think of it like you can &amp;ldquo;inherit&amp;rdquo; bounds from outliving regions.&lt;/p&gt;
+
+&lt;p&gt;For example,&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&#39;a: I--------------------I
+&#39;b:   I----------------I
+&#39;c:      I---------I
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Say we know that, &lt;code&gt;&#39;a: &#39;b&lt;/code&gt;, and &lt;code&gt;&#39;b: &#39;c&lt;/code&gt;. We can then conclude that &lt;code&gt;&#39;a: &#39;c&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;The last rule simply states that &amp;lsquo;a outlives itself. This might seem counterintuitive due to the odd terminology, but think of outlives as &amp;ldquo;outlives or equals to&amp;rdquo;.&lt;/p&gt;
+
+&lt;p&gt;In fact, there is only one more thing we know about regions: they have an unique maximal extrema, which outlives all other regions, &lt;code&gt;&#39;static&lt;/code&gt;. Namely, &lt;code&gt;&#39;static&lt;/code&gt; outlives any region, &lt;code&gt;&#39;a&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;And that&amp;rsquo;s all the &amp;ldquo;axioms&amp;rdquo; of lifetimes.&lt;/p&gt;
+
+&lt;h2 id=&#34;what-subtyping-is&#34;&gt;What subtyping is&lt;/h2&gt;
+
+&lt;p&gt;Before we go to next section, we will just have to briefly cover subtyping. τ is said to be a subtype of υ (denoted &lt;code&gt;τ &amp;lt;: υ&lt;/code&gt;), if a &lt;em&gt;type mismatch&lt;/em&gt;, such that τ is inferred to be of type υ, makes the value of type τ coerce into a value of type υ.&lt;/p&gt;
+
+&lt;p&gt;In other words, you can replace your subtype by a supertype (the parent type) without getting a type mismatch error.&lt;/p&gt;
+
+&lt;h2 id=&#34;regions-are-just-types-outlive-relation-as-a-subtyping-rule&#34;&gt;Regions are just types: Outlive relation as a subtyping rule&lt;/h2&gt;
+
+&lt;p&gt;If you think about it, you may notice that lifetimes are used in type positions &lt;em&gt;a lot&lt;/em&gt;. This is no coincidence, since &lt;em&gt;regions are just types with a subtyping relation&lt;/em&gt;, which is the very reason you are allowed to do e.g. &lt;code&gt;MyStruct&amp;lt;&#39;a&amp;gt;&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;In fact, the outlive relation defines a subtyping rule. That is, you can always &amp;ldquo;shrink&amp;rdquo; a region span. Let &lt;em&gt;c&lt;/em&gt; be a type constructor, &amp;lsquo;a → *, then &amp;lsquo;a: &amp;lsquo;b implies that &lt;code&gt;&#39;a &amp;lt;: &#39;b&lt;/code&gt;, that is &lt;code&gt;&#39;a&lt;/code&gt; can coerce into &lt;code&gt;&#39;b&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;For example, &lt;code&gt;&amp;amp;&#39;static str&lt;/code&gt; can coerce to any &lt;code&gt;&amp;amp;&#39;a str&lt;/code&gt;, since &lt;code&gt;&#39;static&lt;/code&gt; outlives any lifetime.&lt;/p&gt;
+
+&lt;p&gt;Due to the implementation, there are a few limits, though. You can for example not do &lt;code&gt;let a: &#39;a&lt;/code&gt; which would be useless anyways.&lt;/p&gt;
+
+&lt;p&gt;Syntactically, there is a confusion: lifetimes appears in certain trait places, especially in &lt;em&gt;trait bounds&lt;/em&gt;. But, in fact, that is only a syntactic sugar for an imaginary trait, let&amp;rsquo;s call it &lt;code&gt;Scope&lt;/code&gt;, which takes a lifetime.&lt;/p&gt;
+
+&lt;p&gt;This represents the scope of a type, so when writing &lt;code&gt;fn my_func::&amp;lt;T: &#39;static&amp;gt;()&lt;/code&gt; you can think of it as writing &lt;code&gt;fn my_func::&amp;lt;T: Scope&amp;lt;&#39;static&amp;gt;&amp;gt;&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Due to the coercion rules (which will be covered in a future post), this means that if &lt;code&gt;T: Scope&amp;lt;&#39;a&amp;gt;&lt;/code&gt; and &lt;code&gt;U: Scope&amp;lt;&#39;b&amp;gt;&lt;/code&gt; with &lt;code&gt;&#39;a: &#39;b&lt;/code&gt;, then &lt;code&gt;T&lt;/code&gt; is a subtype of &lt;code&gt;U&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2 id=&#34;inferring-regions&#34;&gt;Inferring regions.&lt;/h2&gt;
+
+&lt;p&gt;This is the exciting part. Rust has region inference, allowing it to infer the lifetimes in your program.&lt;/p&gt;
+
+&lt;p&gt;Due to Rust&amp;rsquo;s aliasing guarantees, it tries to &lt;em&gt;minimize&lt;/em&gt; the region&amp;rsquo;s span, while still satisfying the conditions (outlives relations) given.&lt;/p&gt;
+
+&lt;p&gt;So, this is just a classical optimization problem:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;minimize    &#39;a
+subject to  A, B, C...
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;A, B, C&amp;hellip; are outlives relations. &lt;code&gt;&#39;a&lt;/code&gt; may or may not be free in those.&lt;/p&gt;
+
+&lt;p&gt;We will cover how we actually solve this optimization problem in a future blog post, but until then you can see if you can find an algorithm to do so ;).&lt;/p&gt;
+
+&lt;h2 id=&#34;questions-and-errata&#34;&gt;Questions and errata&lt;/h2&gt;
+
+&lt;p&gt;Ping me at #rust in Mozilla IRC.&lt;/p&gt;
+
+&lt;h2 id=&#34;credits&#34;&gt;Credits&lt;/h2&gt;
+
+&lt;p&gt;Credits to Yaniel on IRC for the idea for the name of this series. It is based on the famous &amp;ldquo;lambda cats&amp;rdquo; series, but since Ferris, the crab, is our Rust mascot, we do lambda crabs, instead.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

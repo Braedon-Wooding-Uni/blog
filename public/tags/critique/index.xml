@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Critique on Ticki&#39;s blog</title>
+    <link>http://ticki.github.io/tags/critique/</link>
+    <description>Recent content in Critique on Ticki&#39;s blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Mon, 12 Sep 2016 22:50:08 +0200</lastBuildDate>
+    <atom:link href="http://ticki.github.io/tags/critique/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>A Critique of Rust&#39;s `std::collections`</title>
+      <link>http://ticki.github.io/blog/horrible/</link>
+      <pubDate>Mon, 12 Sep 2016 22:50:08 +0200</pubDate>
+      
+      <guid>http://ticki.github.io/blog/horrible/</guid>
+      <description>
+
+&lt;p&gt;Rust is by far my favorite language, and I am very familiar with it, but there is one aspect that annoys me at times: &lt;code&gt;std::collections&lt;/code&gt;, a part of the opt-out standard library.&lt;/p&gt;
+
+&lt;p&gt;This post will go through the short-fallings of the API and implementation of &lt;code&gt;std::collections&lt;/code&gt;. I&amp;rsquo;ll try to present alternatives and way to improve it.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Update&lt;/strong&gt;: The title was previously &amp;ldquo;Why &lt;code&gt;std::collections&lt;/code&gt; is absolutely horrible&amp;rdquo;. It was in the hope to spark critical discussion, however people were rather annoyed by this title (and I understand why), so I changed it to something less provocative.&lt;/p&gt;
+
+&lt;h1 id=&#34;what-it-contains&#34;&gt;What it contains&lt;/h1&gt;
+
+&lt;p&gt;&lt;code&gt;std::collections&lt;/code&gt; has a rather small set of collections (which is a legitimate choice to make to preserve minimality), the catch being that it&amp;rsquo;s an odd choice of collections:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;B-tree based map and set.&lt;/li&gt;
+&lt;li&gt;Binary heap.&lt;/li&gt;
+&lt;li&gt;Hash table and set.&lt;/li&gt;
+&lt;li&gt;Doubly-linked list.&lt;/li&gt;
+&lt;li&gt;Ring buffer.&lt;/li&gt;
+&lt;li&gt;Random-acess vectors (strictly speaking not in &lt;code&gt;std::collections&lt;/code&gt; but instead in &lt;code&gt;std::vec&lt;/code&gt;).&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;That seems fine, doesn&amp;rsquo;t it? No, it doesn&amp;rsquo;t. If you consider what it lacks of these are very weird choices of structures.&lt;/p&gt;
+
+&lt;p&gt;Take binary heap. It is incredibly useful at times, but is it really fit for a standard library with focus on being minimal? Let&amp;rsquo;s look at the statistics:&lt;/p&gt;
+
+&lt;p&gt;444 examples of usage of this structure (in Rust) on GitHub. Now, we obviously cannot be sure that this sample is representative, but it should give a pretty good insight on the usage.&lt;/p&gt;
+
+&lt;p&gt;Looking through these, approximately 50 of these are tests of &lt;code&gt;BinaryHeap&lt;/code&gt; itself. Another 50 are reimplementations of it. Around 100 of them are duplicates of other codes (e.g. downloaded libraries). This leaves us with around 250 usages, and that&amp;rsquo;s only slightly more than the incredibly useful &lt;code&gt;VecMap&lt;/code&gt;, which isn&amp;rsquo;t even in the standard library!&lt;/p&gt;
+
+&lt;p&gt;If minimalism really is a goal (which I am going to criticize in a minute), it seems rather weird to have a collection which is barely used more than a non-libstd collection.&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s move on to doubly-linked list. Searching on GitHub gives you 534 results. I was unable to find &lt;em&gt;a single place where it was used in a manner that could not be replaced by singly-linked lists&lt;/em&gt;. Chances are that there are some, but they&amp;rsquo;re incredibly rare, and it is odd given that there are no singly-linked list structures in the standard libraries.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Update&lt;/strong&gt;: To clarify here. I&amp;rsquo;m not arguing that the primitives I propose later deserves a place above these, rather that for a minimal set of collections, the choice is rather odd, given that some collections are even more common than some of these.&lt;/p&gt;
+
+&lt;h1 id=&#34;what-it-doesn-t-contain&#34;&gt;What it doesn&amp;rsquo;t contain&lt;/h1&gt;
+
+&lt;h2 id=&#34;concurrent-data-structures&#34;&gt;Concurrent data structures&lt;/h2&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/GmoylkC.png&#34; alt=&#34;How it compares&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The whole standard library contains exactly two concurrent data structures (note that data structures are different from containers), namely the MPSC-queues (the blocking queue with a limited buffer and the non-blocking with an unlimited buffer). These are used for cross-thread message passing and the alike.&lt;/p&gt;
+
+&lt;p&gt;But where are all the other concurrent primitives?&lt;/p&gt;
+
+&lt;p&gt;People tend to wrap their structure in &lt;code&gt;Mutex&lt;/code&gt;, like &lt;code&gt;Mutex&amp;lt;HashMap&amp;lt;...&amp;gt;&amp;gt;&lt;/code&gt;, but that is often an order of magnitude slower than a concurrent hash table.&lt;/p&gt;
+
+&lt;p&gt;Then there&amp;rsquo;s the multithreaded push/pop stacks (as opposed to the queue/unqueue lists), and so on.&lt;/p&gt;
+
+&lt;p&gt;There are quite a few implementations of structures as the ones described above, but they are more often than not poorly implemented. The leading library (which has a pretty good implementation quality) is &lt;a href=&#34;https://github.com/aturon/crossbeam&#34;&gt;crossbeam&lt;/a&gt;, but unfortunately it only implements a very limited set of synchronization primitives (no maps, no tables, no skip lists, etc.).&lt;/p&gt;
+
+&lt;h2 id=&#34;singly-linked-lists&#34;&gt;Singly linked lists&lt;/h2&gt;
+
+&lt;p&gt;I&amp;rsquo;ve already mentioned this, but singly linked list are often useful.&lt;/p&gt;
+
+&lt;h2 id=&#34;keyed-priority-queues&#34;&gt;Keyed priority queues&lt;/h2&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://www.csit.parkland.edu/~mvanmoer/CSC220/2014/images/heap-9.2.f.jpg&#34; alt=&#34;An example of a keyed heap&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Keyed priority queues is the structure everyone ask about and looks for, but no one can name it (here&amp;rsquo;s an exercise: go on Google and try to vaguely describe this structure, you will for sure find at least one thread asking for exactly that description, and often no one is able to answer the question or misguidedly proposes binary heaps instead).&lt;/p&gt;
+
+&lt;p&gt;Say you have an ordered list of elements, each of which has a priority. Now, you want to be able to retrieve the element with the highest or the lowest priority, with a reasonable performance. Note that mere heaps are not sufficient, since they are not arbitrarily ordered, in the sense that you cannot index them without traversing all elements.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Update&lt;/strong&gt;: People think I&amp;rsquo;m talking about binary heaps, but they&amp;rsquo;re fundamentally very different. A keyed priority queue is some arbitrarily ordered list (or map) such that elements with high or low priority can be retrieved quickly. Binary heaps are not associative arrays or lists, they do not allow ordering of the elements, and are thus conceptually simpler than keyed priority queues. Note that keyed priority queues are almost always implemented with binary heaps as the backbone. See [this paper]() for an in-depth description of a general-purpose keyed priority queue&lt;/p&gt;
+
+&lt;p&gt;Keyed priority queues are used everywhere from cache level regulation to efficient scheduling, and are in my opinion one of the most useful data structures of all.&lt;/p&gt;
+
+&lt;p&gt;It is hard to find out exactly how much it is used in the Rust community, given its many names and reimplementations. Only 83 occurrences of the name &amp;ldquo;PriorityQueue&amp;rdquo; in Rust code can be found on GitHub, but I suspect the real number to be much higher.&lt;/p&gt;
+
+&lt;p&gt;The most famous form of keyed priority queues are Fibonacci heaps, which are used in most major database systems, as well as the Linux scheduler, and many memory allocators.&lt;/p&gt;
+
+&lt;h2 id=&#34;treaps&#34;&gt;Treaps&lt;/h2&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://bluehawk.monmouth.edu/rclayton/web-pages/s10-305-503/treapsf4.png&#34; alt=&#34;Insertion in treaps&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Treaps are generally faster than other self-balanced trees (on the average), but the really killer feature is the bulk operations. These are highly efficient algorithms for union, intersections, and set differences.&lt;/p&gt;
+
+&lt;p&gt;When the programmer is manipulating sets like this (union, intersections, and so on) and iterators aren&amp;rsquo;t sufficient (i.e., it is for storage, not iteration), these can be incredibly useful as a high-performance data structure.&lt;/p&gt;
+
+&lt;h2 id=&#34;skip-lists&#34;&gt;Skip lists&lt;/h2&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://igoro.com/wordpress/wp-content/uploads/2008/07/skiplist.png&#34; alt=&#34;An illustration of skip lists&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Skip lists are more niche than the structures described above, but they have excellent performance characteristics.&lt;/p&gt;
+
+&lt;p&gt;Skip lists are conceptually similar to N-ary trees, but in the representation of a list. They&amp;rsquo;re a probabilistic data structure, which holds a list and some number of sublists such that the &lt;em&gt;n&lt;/em&gt;&amp;lsquo;th sublist is a sublist of the &lt;em&gt;n - 1&lt;/em&gt;&amp;lsquo;th sublist. Search can be visualized as binary search by observing how two paths can be taken: A) go to the next sublist B) follow the link.&lt;/p&gt;
+
+&lt;p&gt;The reason a good implementation outperforms a good implementation of classical binary search trees has to do with two reasons:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;On average, 50% of the links followed under a search are cache local, whereas B-trees, for example, are around 20% (&lt;strong&gt;update&lt;/strong&gt;: The original number said 0%, turns out my tests were wrong) cache local.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;No tree rotations or equivalent operations are needed during insertion.&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Skip lists has its use cases, and a &lt;em&gt;good implementation&lt;/em&gt; (flat array, SLOBs, and unrolled lists) can easily outperform B-trees. For really big sets, however, skip lists tends to be slower due to not being as rigidly balanced.&lt;/p&gt;
+
+&lt;h2 id=&#34;self-balancing-trees&#34;&gt;Self-balancing trees&lt;/h2&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/x4QQlZp.png&#34; alt=&#34;An example of a left-leaning red-black tree&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;As mentioned, Rust&amp;rsquo;s standard library already has an excellent implementation of B-trees, a popular form of self-balancing trees.&lt;/p&gt;
+
+&lt;p&gt;The other popular self-balancing trees are good candidates as well (AVL and LLRB/Red-black). While they do essentially the same, they can have very different performance characteristics, and switching can influence the program&amp;rsquo;s performance vastly.&lt;/p&gt;
+
+&lt;p&gt;Having a diverse set of such structures can be good, especially if the documentation details which one to use based on your use case.&lt;/p&gt;
+
+&lt;h2 id=&#34;slobs-aka-pointer-lists-memory-pools-typed-arenas-etc&#34;&gt;SLOBs (aka. pointer lists, memory pools, typed arenas, etc.)&lt;/h2&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/MoaaFPc.png&#34; alt=&#34;An example SLOB&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;This is a very simple, and yet very powerful, data structure. In fact, they are nothing but a glorified singly linked list of pointers to some type. The dealbreaker is the fact that it requires no storage aside from the data it holds.&lt;/p&gt;
+
+&lt;p&gt;That is, no allocation is needed to push and pop pointers from this list. This is possible by letting the data which is inactive hold the list itself.&lt;/p&gt;
+
+&lt;p&gt;So what&amp;rsquo;s the big deal here? It turns out to be extremely useful for region-based memory management. If you have a lot of allocations of the same type, it is often multiple orders of magnitude faster than allocating each of them seperately, and what&amp;rsquo;s even cooler is the data locality it provides: Since it is based on one big contagious segment broken down into pieces, it will only cover a few pages, and consequently it is cache efficient (this fact will be abused in a minute).&lt;/p&gt;
+
+&lt;h1 id=&#34;we-can-just-leave-it-to-other-libraries&#34;&gt;&amp;ldquo;We can just leave it to other libraries&amp;rdquo;&lt;/h1&gt;
+
+&lt;p&gt;A common talking point is that we can simply outsource it to external libraries. Unfortunately, they cannot provide an essential property of the standard library: standardization. Standard libraries serves for making sure t
+he ecosystem is uniform. If something is crucial for keeping the ecosystem together, it deserves a place in the standard library. These are severely underused due to the stigma around adding new dependencies.&lt;/p&gt;
+
+&lt;p&gt;Standardization is absolutely crucial for adoptation.&lt;/p&gt;
+
+&lt;h1 id=&#34;criticizing-the-structures-it-do-have&#34;&gt;Criticizing the structures it do have&lt;/h1&gt;
+
+&lt;h2 id=&#34;hashmap&#34;&gt;&lt;code&gt;HashMap&lt;/code&gt;&lt;/h2&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Hash_table_5_0_1_1_1_1_0_SP.svg/380px-Hash_table_5_0_1_1_1_1_0_SP.svg.png&#34; alt=&#34;Open addressing&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Rust&amp;rsquo;s hash table implementation is perhaps the criticized part, not because it is a bad implementation, but because it is a very performance-critical component, and yet has its rough edges (including a, for some, odd choice of hash functions).&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Update&lt;/strong&gt;: The code is very well-written. The best way to study it is reading it. I recommend doing that.&lt;/p&gt;
+
+&lt;p&gt;A quick overview of the Rust &lt;code&gt;HashMap&lt;/code&gt;/&lt;code&gt;HashSet&lt;/code&gt; implementation is:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Open addressing (Robin Hood hashing)&lt;/li&gt;
+&lt;li&gt;90.9% load factor before reallocation&lt;/li&gt;
+&lt;li&gt;Defaults to Sip-hasher (cryptographic hash function)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Let&amp;rsquo;s just go through these one-by-one and see what&amp;rsquo;s wrong:&lt;/p&gt;
+
+&lt;h3 id=&#34;robin-hood-hashing&#34;&gt;Robin Hood hashing&lt;/h3&gt;
+
+&lt;p&gt;Robin Hood hashing is a double-hashing variant quite, in which you rehash until the slot is free. Robin Hood hashing improves plain double-hashing by making sure the slots occupants are ordered by the probe length.&lt;/p&gt;
+
+&lt;p&gt;So what&amp;rsquo;s the problem here? Well, the cache efficiency is not exactly ideal, but we get freedom from clustering in return.&lt;/p&gt;
+
+&lt;p&gt;The &amp;ldquo;opposite&amp;rdquo; approach is linear probing (where you add some constant - often 1 - to the slot number until it is free), which has the opposite nature: Cache efficiency is really good, but it is very sensitive to clustering.&lt;/p&gt;
+
+&lt;p&gt;A reasonable alternative which takes the best of each of these solutions is quadratic probing, which simply uses a quadratic polynomial to jump between slots (or, in analogy to the one given above, the constant in question increases linearly).&lt;/p&gt;
+
+&lt;p&gt;In most scenarios (especially for large tables), quadratic probing has fewer cache misses, due to better data locality.&lt;/p&gt;
+
+&lt;p&gt;There&amp;rsquo;s no reason to have strong opinions on this subject. The difference is rather small, but interesting nonetheless.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Update&lt;/strong&gt;: As people pointed out, this section contains the error of confusing Rust&amp;rsquo;s implementation of Robin Hood hashing with the original paper. In fact, it is very different: Rust&amp;rsquo;s implementation doesn&amp;rsquo;t rehash, but instead linearly probes, that simply makes the difference even smaller, and it makes it a pretty good choice. I don&amp;rsquo;t know enough to be able to judge if it is better or worse than quadratic probing.&lt;/p&gt;
+
+&lt;h3 id=&#34;a-high-reallocation-threshold&#34;&gt;A high reallocation threshold&lt;/h3&gt;
+
+&lt;p&gt;This mostly comes down to a trade-off between between memory and CPU. If you think about it, 1:9 empty slots is a pretty dense table with an average probe length of 6 rehashes. Potentially (for very large tables) that can lead to 3-6 (avg. 3 or 4, depending on which test) cache misses for just a single lookup.&lt;/p&gt;
+
+&lt;p&gt;The advantage is that it is relatively memory efficient, but that should really only be a concern for really big tables. For most tables, this is way too high, and it trades CPU cycles for memory (which is almost unimportant these days).&lt;/p&gt;
+
+&lt;p&gt;I personally think that having a constant factor is a bad idea. I think it should be some function of the number of elements in the table, such that the factor is lower for small tables (where memory isn&amp;rsquo;t a concern). This way you get memory efficiency when it matters.&lt;/p&gt;
+
+&lt;h3 id=&#34;sip-hasher&#34;&gt;Sip-hasher&lt;/h3&gt;
+
+&lt;p&gt;&lt;img src=&#34;https://i.imgur.com/smjww32.png&#34; alt=&#34;A round of Sip&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Sip-hasher is a cryptographic hash function, and as with most cryptographic hash functions, it is slower than the non-cryptographic counterpart.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Update&lt;/strong&gt;: Some people have pointed out that it is in fact not a cryptographic hash functions, but rather an efficient and yet sufficiently secure hash keyed function. In contrary to DJB2 or xxHash, it is not easy to invert/generate a preimage, which has the consequence of being hard to generate collisions on purpose, a property that can be important for publicly exposed structures (such as databases, KV stores for servers, etc.).&lt;/p&gt;
+
+&lt;p&gt;And it doesn&amp;rsquo;t even have a measurable better quality. I tried giving three different hash functions various data sets. Collision-wise they did equally on every data set, with exception of the English dictionary (as seen below). In every single test, my home-made hash function &amp;ldquo;long hasher&amp;rdquo; beats sip-hasher on performance &lt;em&gt;by a significant factor&lt;/em&gt; (around 30%)&amp;hellip;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;~ SipHasher
+    Filled buckets: 2048
+    Max bucket: 245
+    Time: 0 s. 39232 ms.
+    GB/s: 0.8565382742517557
+~ DJB2
+    Filled buckets: 2048
+    Max bucket: 238
+    Time: 0 s. 39463 ms.
+    GB/s: 0.784737479297558
+~ LongHasher
+    Filled buckets: 2048
+    Max bucket: 239
+    Time: 0 s. 29562 ms.
+    GB/s: 4.95375004585191
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Some investigation shows that the vast majority (98%) of the time of retrieval is used on hashing (it&amp;rsquo;s not clear if the same is true for insertions, but it still have a major influence)). Say you used hash maps for caching database queries. That could potentially translate to 30% faster retrieval on cached queries.&lt;/p&gt;
+
+&lt;p&gt;My point isn&amp;rsquo;t that LongHasher is fantastic, but my point is that there are hash functions which vastly beats sip hasher performance-wise.&lt;/p&gt;
+
+&lt;p&gt;On a side note: These numbers are quite impressive, and if you don&amp;rsquo;t believe me &lt;a href=&#34;https://gist.github.com/anonymous/3b0b489137af9006d5c498f10d42514a&#34;&gt;you can run it yourself&lt;/a&gt;. The reason that long hasher is able to outperform them both is that it consumes eight bytes at once. Otherwise, it is really just multiplying by a prime, adding some constant, multiplying by another byte, rotating right and then XORing by some key.&lt;/p&gt;
+
+&lt;p&gt;Now, if it isn&amp;rsquo;t quality, then what&amp;rsquo;s the reason for using a cryptographic hash function? One reason often cited is Denial-of-Service resistance, and that&amp;rsquo;s a valid concern, but is it really something that everyone should pay for?&lt;/p&gt;
+
+&lt;p&gt;You may know the famous &amp;ldquo;What you don&amp;rsquo;t use, you don&amp;rsquo;t pay for&amp;rdquo; idiom. This is a core part of the &amp;ldquo;abstraction without overhead&amp;rdquo; principle. It is relatively rare to actually need DoS-protection, and you pay for this whenever you use &lt;code&gt;HashMap&lt;/code&gt; without overwriting the hash function.&lt;/p&gt;
+
+&lt;p&gt;And, ignoring that point for a moment, The idea that your code is &amp;lsquo;secure by default&amp;rsquo; is a dangerous one and promotes ignorance about security. You code is &lt;em&gt;not&lt;/em&gt; secure by default.&lt;/p&gt;
+
+&lt;p&gt;If you really do need a fast and yet secure hash function, Sip-hasher is a wonderful choice. To be clear, I&amp;rsquo;m not arguing against Sip-hasher (I actually like the function), but rather against having it as a default choice.&lt;/p&gt;
+
+&lt;h2 id=&#34;btreemap&#34;&gt;&lt;code&gt;BTreeMap&lt;/code&gt;&lt;/h2&gt;
+
+&lt;p&gt;&lt;code&gt;BTreeMap&lt;/code&gt; and &lt;code&gt;BTreeSet&lt;/code&gt; are generally a good implementation. My only criticism has to do with cache efficiency, which is relatively bad when compared to other implementations (Java, mainly). In fact, around 60% (&lt;strong&gt;update&lt;/strong&gt;: Some have obtained other results, ranging from 10%-60%.) of the links followed leads to cache misses. For a map 1000 elements, a lookup would result in approximately 6 cache misses. For 10000, the number is 8.&lt;/p&gt;
+
+&lt;p&gt;These can be quite expensive. A solution is proposed in the section about &amp;ldquo;Cache-efficient structures&amp;rdquo;.&lt;/p&gt;
+
+&lt;h2 id=&#34;vecdeque&#34;&gt;&lt;code&gt;VecDeque&lt;/code&gt;&lt;/h2&gt;
+
+&lt;p&gt;&lt;code&gt;VecDeque&lt;/code&gt; is a decent implementation. The only problem is that you cannot range index (slice) it. This is due to the very nature of ring buffers.&lt;/p&gt;
+
+&lt;p&gt;An alternative to conventional ring buffers is &lt;a href=&#34;http://www.codeproject.com/Articles/3479/The-Bip-Buffer-The-Circular-Buffer-with-a-Twist&#34;&gt;biparite buffers&lt;/a&gt;, which has essentially the same performance, but allows this (and other interesting) API.&lt;/p&gt;
+
+&lt;h2 id=&#34;mpsc&#34;&gt;MPSC&lt;/h2&gt;
+
+&lt;p&gt;MPSC is a popular tool for message passing, but a critical point is often overlooked: Every queuing/dequeueing involves a malloc call. That sounds pretty bad, doesn&amp;rsquo;t it?&lt;/p&gt;
+
+&lt;p&gt;MPSC is supposed to be lock-less, but that isn&amp;rsquo;t the case if the tcache is empty. Then it involves a lock.&lt;/p&gt;
+
+&lt;p&gt;Since you effectively queue and dequeue all of the time, you actually waste allocations going in and out the allocator. That&amp;rsquo;s a major overhead, and totally unreflected in the API, giving an illusion of zero-cost.&lt;/p&gt;
+
+&lt;p&gt;And, it turns out that it isn&amp;rsquo;t necessary. Because of the ring-buffer-like structure of MPSC, you can effectively store it all in a concurrent SLOB list, making malloc calls incredibly rare (ideally only upon the first queue).&lt;/p&gt;
+
+&lt;p&gt;My benchmarks I&amp;rsquo;ve made on &lt;a href=&#34;https://github.com/redox-os/ralloc&#34;&gt;ralloc&lt;/a&gt;, a memory allocator I wrote, (which uses mpsc internally for cross-thread frees) shows a significant performance gain. An exercise for the reader is to do the same for Servo and try to see if it affects performance.&lt;/p&gt;
+
+&lt;h2 id=&#34;vec&#34;&gt;&lt;code&gt;Vec&lt;/code&gt;&lt;/h2&gt;
+
+&lt;p&gt;My criticism of &lt;code&gt;Vec&lt;/code&gt; is the lack of API for manual management. One particular missing thing is the ability to replace the reallocation strategy with a custom one.&lt;/p&gt;
+
+&lt;p&gt;Vectors are used everywhere and they often have different usage patterns, many of which can be exploited to improve performance and memory efficiency.&lt;/p&gt;
+
+&lt;p&gt;Another thing I sometimes need is the ability to get a mutable reference to the element I pushed without needing extra bound checks (note that in most cases this is a trivial optimization for LLVM, but it adds a lot of convenience). This could simply be solved by having &lt;code&gt;push&lt;/code&gt; return &lt;code&gt;&amp;amp;mut T&lt;/code&gt;. This is technically a breaking change but I doubt it will affect anybody.&lt;/p&gt;
+
+&lt;h1 id=&#34;cache-efficient-structures&#34;&gt;Cache-efficient structures&lt;/h1&gt;
+
+&lt;p&gt;I spoke a little about SLOB-based arenas previously. It turns out to have major impact on the cache efficiency, and thereby the performance, of the structure.&lt;/p&gt;
+
+&lt;p&gt;The idea is that each structure holds an arena which only spans a few memory pages, ensure data locality. Obviously, this is more memory hunky, but it is conceptually similar to vectors which reserve extra memory to avoid reallocation. In this case, we are looking for avoiding allocation instead.&lt;/p&gt;
+
+&lt;p&gt;Depending on what you&amp;rsquo;re doing it affects the performance positively by 3-10% (B-trees), 5-15% (linked lists), or 40-80% (mpsc). Those numbers are quite impressive (especially the last one).&lt;/p&gt;
+
+&lt;h1 id=&#34;replacing-the-allocator&#34;&gt;Replacing the allocator&lt;/h1&gt;
+
+&lt;p&gt;Another lacking feature is an &lt;code&gt;Allocator&lt;/code&gt; trait, which is intended to be the bound of some generic parameter in all the collections, allowing you to replace the allocator to exploit allocation patterns of the structure.&lt;/p&gt;
+
+&lt;p&gt;An RFC for exactly this &lt;a href=&#34;https://github.com/rust-lang/rfcs/pull/1398&#34;&gt;already exists&lt;/a&gt; and is merged, but the implementation is incomplete.&lt;/p&gt;
+
+&lt;h1 id=&#34;hiding-box&#34;&gt;Hiding &lt;code&gt;Box&lt;/code&gt;&lt;/h1&gt;
+
+&lt;p&gt;An unfortunate thing is hiding the overhead by letting the function itself allocate, instead of letting the caller do it. This is (or at least, should be) considered bad style, because the API ought to reflect the semantics and performance characteristics. If the allocation is hidden to the programmer, she might not realize the expensive operations behind the scenes.&lt;/p&gt;
+
+&lt;h1 id=&#34;the-good-parts&#34;&gt;The good parts&lt;/h1&gt;
+
+&lt;p&gt;The implementations them self are really good and well-tested, and many of the points I made above are only relevant, when you are looking for very fine-grained performance. I have not criticized the API itself, because I think it does very well. Rust&amp;rsquo;s collection API is one of the most well-designed I&amp;rsquo;ve seen.&lt;/p&gt;
+
+&lt;p&gt;It is also worth noting that the ecosystem contains lots of wonderful structures and implementations of these. Rust&amp;rsquo;s ecosystem is getting more mature by every day, and to this day, it even contains very niche structures for very specific purposes, and that&amp;rsquo;s really great since it means expansion of Rust&amp;rsquo;s domain.&lt;/p&gt;
+
+&lt;h1 id=&#34;conclusion&#34;&gt;Conclusion&lt;/h1&gt;
+
+&lt;p&gt;Rust&amp;rsquo;s &amp;ldquo;collection of collections&amp;rdquo; has quite a few short-fallings. Fortunately, Most of the problems described above are not inherent, and can be fixed. The first step through fixing a problem is diagnosing it, and I hope that this post is able to initiate some critical discussion around the implementation, API, and choice of collections for the standard library.&lt;/p&gt;
+
+&lt;p&gt;There are already many different proposals floating around in the community, as well as implementations and so on. I hope we can look into lifting these or replacing them in libstd.&lt;/p&gt;
+
+&lt;p&gt;The &lt;a href=&#34;https://github.com/contain-rs&#34;&gt;contain-rs&lt;/a&gt; GitHub organization does a great job at providing a collection of various data structures, most of which are incredibly well-written. It would be interesting to see some of those in the standard library.&lt;/p&gt;
+
+&lt;h1 id=&#34;an-apology&#34;&gt;An apology&lt;/h1&gt;
+
+&lt;p&gt;The original title was exaggerated and inflammatory. To clarify, I don&amp;rsquo;t think it is horrible, nor even bad, rather I&amp;rsquo;d want a discussion/critical examination of the module and ways to improve it. I do realize that many people have spend a lot of time on implementing all these, and I admire it, calling it horrible (even if it is only in the title) is not fair, and it will likely distract the reader from the message of the post instead of inciting discussion. The mistake was entirely mine, and I should have given it a better title. Sorry.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

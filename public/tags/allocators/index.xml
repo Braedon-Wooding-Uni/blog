@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Allocators on Ticki&#39;s blog</title>
+    <link>http://ticki.github.io/tags/allocators/</link>
+    <description>Recent content in Allocators on Ticki&#39;s blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sun, 23 Oct 2016 23:25:15 +0200</lastBuildDate>
+    <atom:link href="http://ticki.github.io/tags/allocators/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>On Random-Access Compression</title>
+      <link>http://ticki.github.io/blog/on-random-access-compression/</link>
+      <pubDate>Sun, 23 Oct 2016 23:25:15 +0200</pubDate>
+      
+      <guid>http://ticki.github.io/blog/on-random-access-compression/</guid>
+      <description>&lt;script type=&#34;text/javascript&#34;
+  src=&#34;https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&#34;&gt;
+&lt;/script&gt;
+
+&lt;p&gt;This post will contains an algorithm I came up with, doing efficient rolling compression. It&#39;s going to be used in &lt;a href=&#34;https://github.com/ticki/tfs&#34;&gt;TFS&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h1 id=&#34;what-is-rolling-compression&#34;&gt;What is rolling compression?&lt;/h1&gt;
+
+&lt;p&gt;Consider that you have a large file and you want to compress it. That&#39;s easy enough and many algorithms exists for doing so. Now, consider that you want to read or write a small part of the file.&lt;/p&gt;
+
+&lt;p&gt;Most algorithms would require you to decompress, write, and recompress the whole file. Clearly, this gets expensive when the file is big.&lt;/p&gt;
+
+&lt;h1 id=&#34;clusterbased-compression&#34;&gt;Cluster-based compression&lt;/h1&gt;
+
+&lt;p&gt;A cluster is some small fixed-size block (often 512, 1024, or 4096 bytes). We can have a basic cluster allocator by linking unused clusters together. Cluster-centric compression is interesting, because it can exploit the allocator.&lt;/p&gt;
+
+&lt;p&gt;So, the outline is that we compress every &lt;span  class=&#34;math&#34;&gt;\(n\)&lt;/span&gt; adjacent clusters to some &lt;span  class=&#34;math&#34;&gt;\(n&#39; &lt; n%&gt;\)&lt;/span&gt;, then we can free the excessive clusters in this compressed line.&lt;/p&gt;
+
+&lt;h1 id=&#34;copyonwrite&#34;&gt;Copy-on-write&lt;/h1&gt;
+
+&lt;p&gt;Our algorithm is not writable, but it can be written by allocating, copying, and deallocating. This is called copy-on-write, or COW for short. It is a common technique used in many file systems.&lt;/p&gt;
+
+&lt;p&gt;Essentially, we never write a cluster. Instead, we allocate a new cluster, and copy the data to it. Then we deallocate the old cluster.&lt;/p&gt;
+
+&lt;p&gt;This allows us to approach everything much more functionally, and we thus don&#39;t have to worry about make compressible blocks uncompressible (consider that you overwrite a highly compressible cluster with random data, then you extend a physical cluster containing many virtual clusters, these wouldn&#39;t be possible to have in one cluster).&lt;/p&gt;
+
+&lt;h1 id=&#34;physical-and-virtual-clusters&#34;&gt;Physical and virtual clusters&lt;/h1&gt;
+
+&lt;p&gt;Our goal is really fit multiple clusters into one physical cluster. Therefore, it is essential to distinguish between physical (the stored) and virtual (the compressed) clusters.&lt;/p&gt;
+
+&lt;p&gt;A physical cluster can contain up to 8 virtual clusters. A pointer to a virtual cluster starts with 3 bits defining the index into the physical cluster, which is defined by the rest of the pointer.&lt;/p&gt;
+
+&lt;p&gt;The allocated physical cluster contains 8 bitflags, defining which of the 8 virtual clusters in the physical cluster are used. This allows us to know how many virtual clusters we need to go over before we get the target decompressed cluster.&lt;/p&gt;
+
+&lt;p&gt;When the integer hits zero (i.e. all the virtual clusters are freed), the physical cluster is freed.&lt;/p&gt;
+
+&lt;p&gt;Since an active cluster will never have the state zero, we use this blind state to represent an uncompressed physical cluster. This means we maximally have one byte in space overhead for uncompressible clusters.&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/virtual_physical_random_access_compression_diagram.svg&#34; alt=&#34;A diagram&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;h1 id=&#34;the-physical-cluster-allocator&#34;&gt;The physical cluster allocator&lt;/h1&gt;
+
+&lt;p&gt;The cluster allocator is nothing but a linked list of clusters. Every free cluster links to another free cluster or NIL (no more free clusters).&lt;/p&gt;
+
+&lt;p&gt;This method is called SLOB (Simple List Of Objects) and has the advantage of being complete zero-cost in that there is no wasted space.&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/slob_allocation_diagram.svg&#34; alt=&#34;Physical allocation is simply linked list of free objects.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;h1 id=&#34;the-virtual-cluster-allocator&#34;&gt;The virtual cluster allocator&lt;/h1&gt;
+
+&lt;p&gt;Now we hit the meat of the matter.&lt;/p&gt;
+
+&lt;p&gt;When virtual cluster is allocated, we read from the physical cluster list. The first thing we will check is if we can fit in our virtual cluster into the cluster next to the head of the list (we wrap if we reach the end).&lt;/p&gt;
+
+&lt;p&gt;If we can fit it in &lt;em&gt;and&lt;/em&gt; we have less than 8 virtual clusters in this physical cluster, we will put it into the compressed physical cluster at the first free virtual slot (and then set the respective bitflag):&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/allocating_compressed_virtual_page_into_next_diagram.svg&#34; alt=&#34;We try to fit it into the next cluster.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;If we cannot, we pop the list and use the fully-free physical cluster to store etablish a new stack of virtual clusters. It starts as uncompressed:&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/pop_and_create_new_uncompressed_cluster_diagram.svg&#34; alt=&#34;We pop the list and put the virtual cluster in the physical uncompressed slot.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;h1 id=&#34;properties-of-this-approach&#34;&gt;Properties of this approach&lt;/h1&gt;
+
+&lt;p&gt;This approach to writable random-access compression has some very nice properties.&lt;/p&gt;
+
+&lt;h2 id=&#34;compression-miss&#34;&gt;Compression miss&lt;/h2&gt;
+
+&lt;p&gt;We call it a compression miss when we need to pop from the freelist (i.e. we cannot fit it into the cluster next to the head). When you allocate you can maximally have one compression miss, and therefore allocation is constant-time.&lt;/p&gt;
+
+&lt;h2 id=&#34;every-cluster-has-a-sister-cluster&#34;&gt;Every cluster has a sister cluster&lt;/h2&gt;
+
+&lt;p&gt;Because the &amp;quot;next cluster or wrap&amp;quot; function is bijective, we&#39;re sure that we try to insert a virtual cluster to every cluster at least once. This wouldn&#39;t be true if we used a hash function or something else.&lt;/p&gt;
+
+&lt;p&gt;This has the interesting consequence that filled clusters won&#39;t be tried to allocate in multiple times.&lt;/p&gt;
+
+&lt;h1 id=&#34;limitations&#34;&gt;Limitations&lt;/h1&gt;
+
+&lt;p&gt;A number of limitations are in this algorithms. The first and most obvious one is the limitation on the compression ratio. This is a minor one: it limits the ratio to maxmially slightly less than 1:8.&lt;/p&gt;
+
+&lt;p&gt;A more important limitation is fragmentation. If I allocate many clusters and then deallocate some of them such that many adjacent physical clusters only contain one virtual cluster, this row will have a compression ratio of 1:1 until they&#39;re deallocated. Note that it is very rare that this happens, and will only marginally affect the global compression ratio.&lt;/p&gt;
+
+&lt;h1 id=&#34;update-an-idea&#34;&gt;Update: An idea&lt;/h1&gt;
+
+&lt;p&gt;A simple trick can improve performance in some cases. Instead of compressing all the virtual clusters in a physical cluster together, you should compress each virtual cluster seperately and place them sequentially (with some delimiter) in the physical cluster.&lt;/p&gt;
+
+&lt;p&gt;If your compression algorithm is streaming, you can much faster iterate to the right delimiter, and then only decompress that virtual cluster.&lt;/p&gt;
+
+&lt;p&gt;This has the downside of making the compression ratio worse. One solution is to have an initial dictionary (if using a dictionary-based compression algorithm).&lt;/p&gt;
+
+&lt;p&gt;Another idea is to eliminate the cluster state and replace it by repeated delimiters. I need to investigate this some more with benchmarks and so on in order to tell if this is actually superior to having a centralized cluster state.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

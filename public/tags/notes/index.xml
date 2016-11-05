@@ -1,0 +1,515 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Notes on Ticki&#39;s blog</title>
+    <link>http://ticki.github.io/tags/notes/</link>
+    <description>Recent content in Notes on Ticki&#39;s blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Fri, 04 Nov 2016 16:28:44 +0200</lastBuildDate>
+    <atom:link href="http://ticki.github.io/tags/notes/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Designing a good non-cryptographic hash function</title>
+      <link>http://ticki.github.io/blog/designing-a-good-non-cryptographic-hash-function/</link>
+      <pubDate>Fri, 04 Nov 2016 16:28:44 +0200</pubDate>
+      
+      <guid>http://ticki.github.io/blog/designing-a-good-non-cryptographic-hash-function/</guid>
+      <description>&lt;script type=&#34;text/javascript&#34;
+  src=&#34;https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&#34;&gt;
+&lt;/script&gt;
+
+&lt;p&gt;So, I&#39;ve been needing a hash function for various purposes, lately. None of the existing hash functions I could find were sufficient for my needs, so I went and designed my own. These are my notes on the design of hash functions.&lt;/p&gt;
+
+&lt;h1 id=&#34;what-is-a-hash-function-really&#34;&gt;What is a hash function &lt;em&gt;really&lt;/em&gt;?&lt;/h1&gt;
+
+&lt;p&gt;Hash functions are functions which maps a infinite domain to a finite codomain. Two elements in the domain, &lt;span  class=&#34;math&#34;&gt;\(a, b\)&lt;/span&gt; are said to collide if &lt;span  class=&#34;math&#34;&gt;\(h(a) = h(b)\)&lt;/span&gt;.&lt;/p&gt;
+
+&lt;p&gt;The ideal hash functions has the property that the distribution of image of a a subset of the domain is statistically independent of the probability of said subset occuring. That is, collisions are not likely to occur even within non-uniform distributed sets.&lt;/p&gt;
+
+&lt;p&gt;Consider you have an english dictionary. Clearly, &lt;code&gt;hello&lt;/code&gt; is more likely to be a word than &lt;code&gt;ctyhbnkmaasrt&lt;/code&gt;, but the hash function must not be affected by this statistical redundancy.&lt;/p&gt;
+
+&lt;p&gt;In a sense, you can think of the ideal hash function as being a function where the output is uniformly distributed (e.g., chosen by a sequence of coinflips) over the codomain no matter what the distribution of the input is.&lt;/p&gt;
+
+&lt;p&gt;With a good hash function, it should be hard to distinguish between a truely random sequence and the hashes of some permutation of the domain.&lt;/p&gt;
+
+&lt;p&gt;Hash function ought to be as chaotic as possible. A small change in the input should appear in the output as if it was a big change. This is called the hash function butterfly effect.&lt;/p&gt;
+
+&lt;h2 id=&#34;noncryptographic-and-cryptographic&#34;&gt;Non-cryptographic and cryptographic&lt;/h2&gt;
+
+&lt;p&gt;One must make the distinction between cryptographic and non-cryptographic hash functions. In a cryptographic hash function, it must be infeasible to:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Generate the input from its hash output.&lt;/li&gt;
+&lt;li&gt;Generate two inputs with the same output.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Non-cryptographic hash functions can be thought of as approximations of these invariants. The reason for the use of non-cryptographic hash function is that they&#39;re significantly faster than cryptographic hash functions.&lt;/p&gt;
+
+&lt;h1 id=&#34;diffusions-and-bijection&#34;&gt;Diffusions and bijection&lt;/h1&gt;
+
+&lt;p&gt;The basic building block of good hash functions are difussions. Difussions can be thought of as bijective (i.e. every input has one and only one output, and vice versa) hash functions, namely that input and output are uncorrelated:&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/bijective_diffusion_diagram.svg&#34; alt=&#34;A diagram of a diffusion.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;This diffusion function has a relatively small domain, for illustrational purpose.&lt;/p&gt;
+
+&lt;h2 id=&#34;building-a-good-diffusion&#34;&gt;Building a good diffusion&lt;/h2&gt;
+
+&lt;p&gt;Diffusions are often build by smaller, bijective components, which we will call &amp;quot;subdiffusions&amp;quot;.&lt;/p&gt;
+
+&lt;h3 id=&#34;types-of-subdiffusions&#34;&gt;Types of subdiffusions&lt;/h3&gt;
+
+&lt;p&gt;One must distinguish between the different kinds of subdiffusions.&lt;/p&gt;
+
+&lt;p&gt;The first class to consider is the &lt;strong&gt;bitwise subdiffusions&lt;/strong&gt;. These are quite weak when they stand alone, and thus must be combined with other types of subdiffusions. Bitwise subdiffusions might flip certain bits and/or reorganize them:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[d(x) = \sigma(x) \oplus m\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;(we use &lt;span  class=&#34;math&#34;&gt;\(\sigma\)&lt;/span&gt; to denote permutation of bits)&lt;/p&gt;
+
+&lt;p&gt;The second class is &lt;strong&gt;dependent bitwise subdiffusions&lt;/strong&gt;. These are diffusions which permutes the bits and XOR them with the original value:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[d(x) = \sigma(x) \oplus x\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;(exercise to reader: prove that the above subdivision is revertible)&lt;/p&gt;
+
+&lt;p&gt;Another similar often used subdiffusion in the same class is the XOR-shift:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[d(x) = (x \ll m) \oplus x\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;(note that &lt;span  class=&#34;math&#34;&gt;\(m\)&lt;/span&gt; can be negative, in which case the bitshift becomes a right bitshift)&lt;/p&gt;
+
+&lt;p&gt;The next subdiffusion are of massive importance. It&#39;s the class of &lt;strong&gt;linear subdiffusions&lt;/strong&gt; similar to the LCG random number generator:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[d(x) \equiv ax + c \pmod m, \quad \gcd(x, m) = 1\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;(&lt;span  class=&#34;math&#34;&gt;\(\gcd\)&lt;/span&gt; means &amp;quot;greatest common divisor&amp;quot;, this constraint is necessary in order to have &lt;span  class=&#34;math&#34;&gt;\(a\)&lt;/span&gt; have an inverse in the ring)&lt;/p&gt;
+
+&lt;p&gt;The next are particularly interesting, it&#39;s the &lt;strong&gt;arithmetic subdiffusions&lt;/strong&gt;:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[d(x) = x \oplus (x + c)\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;h3 id=&#34;combining-subdiffusions&#34;&gt;Combining subdiffusions&lt;/h3&gt;
+
+&lt;p&gt;Subdiffusions themself are quite poor quality. Combining them is what creates a good diffusion function.&lt;/p&gt;
+
+&lt;p&gt;Indeed if you combining enough different subdiffusions, you get a good diffusion function, but there is a catch: The more subdiffusions you combine the slower it is to compute.&lt;/p&gt;
+
+&lt;p&gt;As such, it is important to find a small, diverse set of subdiffusions which has a good quality.&lt;/p&gt;
+
+&lt;h3 id=&#34;zerosensitivity&#34;&gt;Zero-sensitivity&lt;/h3&gt;
+
+&lt;p&gt;If your diffusion isn&#39;t zero-sensitive (i.e., &lt;span  class=&#34;math&#34;&gt;\(f(x) = \{0, 1\}\)&lt;/span&gt;), you should &lt;del&gt;panic&lt;/del&gt; come up with something better. In particular, make sure your diffusion contains at least one zero-sensitive subdiffusion as component.&lt;/p&gt;
+
+&lt;h3 id=&#34;avalanche-diagrams&#34;&gt;Avalanche diagrams&lt;/h3&gt;
+
+&lt;p&gt;Avalanche diagrams are the best and quickist way to find out if your diffusion function has a good quality.&lt;/p&gt;
+
+&lt;p&gt;Essentially, you draw a grid such that the &lt;span  class=&#34;math&#34;&gt;\((x, y)\)&lt;/span&gt; cell&#39;s color represents the probability that flipping &lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt;&#39;th bit of the input will result of &lt;span  class=&#34;math&#34;&gt;\(y\)&lt;/span&gt;&#39;th bit being flipped in the output. If &lt;span  class=&#34;math&#34;&gt;\((x, y)\)&lt;/span&gt; is very red, the probability that &lt;span  class=&#34;math&#34;&gt;\(d(a&#39;)\)&lt;/span&gt;, where &lt;span  class=&#34;math&#34;&gt;\(a&#39;\)&lt;/span&gt; is &lt;span  class=&#34;math&#34;&gt;\(a\)&lt;/span&gt; with the &lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt;&#39;th bit flipped,&#39; has the &lt;span  class=&#34;math&#34;&gt;\(y\)&lt;/span&gt;&#39;th bit flipped is very high.&lt;/p&gt;
+
+&lt;p&gt;Here&#39;s an example of the identity function, &lt;span  class=&#34;math&#34;&gt;\(f(x) = x\)&lt;/span&gt;:&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/identity_function_avalanche_diagram.svg&#34; alt=&#34;The identity function.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;So why is it a straight line?&lt;/p&gt;
+
+&lt;p&gt;Well, if you flip the &lt;span  class=&#34;math&#34;&gt;\(n\)&lt;/span&gt;&#39;th bit in the input, the only bit flipped in the output is the &lt;span  class=&#34;math&#34;&gt;\(n\)&lt;/span&gt;&#39;th bit. That&#39;s kind of boring, let&#39;s try adding a number:&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/addition_avalanche_diagram.svg&#34; alt=&#34;Adding a big number.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;Meh, this is kind of obvious. Let&#39;s try multiplying by a prime:&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/prime_multiplication_avalanche_diagram.svg&#34; alt=&#34;Multiplying by a non-even prime is a bijection.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;Now, this is quite interesting actually. We call all the black area &amp;quot;blind spots&amp;quot;, and you can see here that anything with &lt;span  class=&#34;math&#34;&gt;\(x &gt; y\)&lt;/span&gt; is a blind spot. Why is that? Well, if I flip a high bit, it won&#39;t affect the lower bits because you can see multiplication as a form of overlay:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;100011101000101010101010111
+      :
+    111
+↕↕↕↕↕↕↕↕↕↕↕↕↕↕↕↕↕↕↕↕↕↕↕↕↕↕↕
+100000001000101010101010111
+      :
+    111
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Flipping a single bit will only change the integer forward, never backwards, hence it forms this blind spot. So how can we fix this (we don&#39;t want this bias)?&lt;/p&gt;
+
+&lt;h4 id=&#34;designing-a-diffusion-function--by-example&#34;&gt;Designing a diffusion function -- by example&lt;/h4&gt;
+
+&lt;p&gt;If we throw in (after prime multiplication) a dependent bitwise-shift subdiffusions, we have&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\begin{align*}
+x &amp;\gets x + 1 \\
+x &amp;\gets x \oplus (x \gg z) \\
+x &amp;\gets px \\
+x &amp;\gets x \oplus (x \ll z) \\
+\end{align*}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;(note that we have the &lt;span  class=&#34;math&#34;&gt;\(+1\)&lt;/span&gt; in order to make it zero-sensitive)&lt;/p&gt;
+
+&lt;p&gt;This generates following avalanche diagram&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/shift_xor_multiply_avalanche_diagram.svg&#34; alt=&#34;Shift-XOR then multiply.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;What can cause these? Clearly there is some form of bias. Turns out that this bias mostly originates in the lack of hybrid arithmetic/bitwise sub.
+Without such hybrid, the behavior tends to be relatively local and not interfering well with each other.&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[x \gets x + \text{ROL}_k(x)\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;At this point, it looks something like&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/shift_xor_multiply_rotate_avalanche_diagram.svg&#34; alt=&#34;Shift-XOR then multiply.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;That&#39;s good, but we&#39;re not quite there yet...&lt;/p&gt;
+
+&lt;p&gt;Let&#39;s throw in the following bijection:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[x \gets px \oplus (px \gg z)\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;And voilà, we now have a perfect bit independence:&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/perfect_avalanche_diagram.svg&#34; alt=&#34;Everything is red!&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;So our finalized version of an example diffusion is&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\begin{align*}
+x &amp;\gets x + 1 \\
+x &amp;\gets x \oplus (x \gg z) \\
+x &amp;\gets px \\
+x &amp;\gets x \oplus (x \ll z) \\
+x &amp;\gets x + \text{ROL}_k(x) \\
+x &amp;\gets px \\
+x &amp;\gets x \oplus (x \gg z) \\
+\end{align*}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;That seems like a pretty lengthy chunk of operations. We will try to boil it down to few operations while preserving the quality of this diffusion.&lt;/p&gt;
+
+&lt;p&gt;The most obvious think to remove is the rotation line. But it hurts quality:&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/multiply_up_avalanche_diagram.svg&#34; alt=&#34;Here&#39;s the avalanche diagram of said line removed.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;Where do these blind spot comes from? The answer is pretty simple: shifting left moves the entropy upwards, hence the multiplication will never really flip the lower bits. For example, if we flip the sixth bit, and trace it down the operations, you will how it never flips in the other end.&lt;/p&gt;
+
+&lt;p&gt;So what do we do? Instead of shifting left, we need to shift right, since multiplication only affects upwards:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\begin{align*}
+x &amp;\gets x + 1 \\
+x &amp;\gets x \oplus (x \gg z) \\
+x &amp;\gets px \\
+x &amp;\gets x \oplus (x \gg z) \\
+x &amp;\gets px \\
+x &amp;\gets x \oplus (x \gg z) \\
+\end{align*}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;And we&#39;re back again. This time with two less instructions.&lt;/p&gt;
+
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/cakehash_stage_1_avalanche_diagram.svg&#34; alt=&#34;Stage 1&#34;&gt;&lt;/figure&gt;&lt;/th&gt;
+&lt;th&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/cakehash_stage_2_avalanche_diagram.svg&#34; alt=&#34;Stage 2&#34;&gt;&lt;/figure&gt;&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/cakehash_stage_3_avalanche_diagram.svg&#34; alt=&#34;Stage 3&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+&lt;/td&gt;
+&lt;td&gt;&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/cakehash_stage_4_avalanche_diagram.svg&#34; alt=&#34;Stage 4&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+
+&lt;tr&gt;
+&lt;td&gt;&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/cakehash_stage_5_avalanche_diagram.svg&#34; alt=&#34;Stage 5&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+&lt;/td&gt;
+&lt;td&gt;&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/perfect_avalanche_diagram.svg&#34; alt=&#34;Stage 6&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+&lt;h1 id=&#34;combining-diffusions&#34;&gt;Combining diffusions&lt;/h1&gt;
+
+&lt;p&gt;Diffusions maps a finite state space to a finite state space, as such they&#39;re not alone sufficient as arbitrary-length hash function, so we need a way to combine diffusions.&lt;/p&gt;
+
+&lt;p&gt;In particular, we can eat &lt;span  class=&#34;math&#34;&gt;\(N\)&lt;/span&gt; bytes of the input at once and modify the state based on that:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[s&#39; = d(f(s&#39;, x))\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;Or in graphic form,&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/hash_round_flowchart.svg&#34; alt=&#34;A flowchart.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\(f(s&#39;, x)\)&lt;/span&gt; is what we call our combinator function. It serves for combining the old state and the new input block (&lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt;). &lt;span  class=&#34;math&#34;&gt;\(d(a)\)&lt;/span&gt; is just our diffusion function.&lt;/p&gt;
+
+&lt;p&gt;It doesn&#39;t matter if the combinator function is commutative or not, but it is crucial that it is not biased, i.e. if &lt;span  class=&#34;math&#34;&gt;\(a, b\)&lt;/span&gt; are uniformly distributed variables, &lt;span  class=&#34;math&#34;&gt;\(f(a, b)\)&lt;/span&gt; is too. Ideally, there should exist a bijection, &lt;span  class=&#34;math&#34;&gt;\(g(f(a, b), b) = a\)&lt;/span&gt;, which implies that it is not biased.&lt;/p&gt;
+
+&lt;p&gt;An example of such combination function is simple addition.&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[f(a, b) = a + b\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;Another is&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[f(a, b) = a \oplus b\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;I&#39;m partial towards saying that these are the only sane choices for combinator functions, and you must pick between them based on the characteristics of your diffusion function:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;If your diffusion function is primarily based on arithmetics, you should use the XOR combinator function.&lt;/li&gt;
+&lt;li&gt;If your diffusion function is primarily based on bitwise operations, you should use the additive combinator function.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;The reason for this is that you want to have the operations to be as diverse as possible, to create complex, seemingly random behavior.&lt;/p&gt;
+
+&lt;h1 id=&#34;simd-simd-simd&#34;&gt;SIMD, SIMD, SIMD&lt;/h1&gt;
+
+&lt;p&gt;If you want good performance, you shouldn&#39;t read only one byte at a time. By reading multiple bytes at a time, your algorithm becomes several times faster.&lt;/p&gt;
+
+&lt;p&gt;This however introduces the need for some finalization, if the total number of written bytes doesn&#39;t divide the number of bytes read in a round. One possibility is to pad it with zeros and write the total length in the end, however this turns out to be somewhat slow for small inputs.&lt;/p&gt;
+
+&lt;p&gt;A better option is to write in the number of padding bytes into the last byte.&lt;/p&gt;
+
+&lt;h1 id=&#34;instruction-level-parallelism&#34;&gt;Instruction level parallelism&lt;/h1&gt;
+
+&lt;p&gt;Fetching multiple blocks and sequentially (without dependency until last) running a round is something I&#39;ve found to work well. This has to do with the so-called instruction pipeline in which modern processors run instructions in parallel when they can.&lt;/p&gt;
+
+&lt;h1 id=&#34;testing-the-hash-function&#34;&gt;Testing the hash function&lt;/h1&gt;
+
+&lt;p&gt;Multiple test suits for testing the quality and performance of your hash function. &lt;a href=&#34;https://github.com/aappleby/smhasher&#34;&gt;Smhasher&lt;/a&gt; is one of these.&lt;/p&gt;
+
+&lt;h1 id=&#34;conclusion&#34;&gt;Conclusion&lt;/h1&gt;
+
+&lt;p&gt;Many relatively simple components can be combined into a strong and robust non-cryptographic hash function for use in hash tables and in checksumming. Deriving such a function is really just coming up with the components to construct this hash function.&lt;/p&gt;
+
+&lt;p&gt;Breaking the problem down into small subproblems significantly simplifies analysis and guarantees.&lt;/p&gt;
+
+&lt;p&gt;The key to a good hash function is to try-and-miss. Testing and throwing out candidates is the only way you can really find out if you hash function works in practice.&lt;/p&gt;
+
+&lt;p&gt;Have fun hacking!&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>How LZ4 works</title>
+      <link>http://ticki.github.io/blog/how-lz4-works/</link>
+      <pubDate>Tue, 25 Oct 2016 23:25:15 +0200</pubDate>
+      
+      <guid>http://ticki.github.io/blog/how-lz4-works/</guid>
+      <description>&lt;script type=&#34;text/javascript&#34;
+  src=&#34;https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&#34;&gt;
+&lt;/script&gt;
+
+&lt;p&gt;LZ4 is a really fast compression algorithm with a reasonable compression ratio, but unfortunately there is limited documentation on how it works. The only explanation (not spec, explanation) &lt;a href=&#34;https://fastcompression.blogspot.com/2011/05/lz4-explained.html&#34;&gt;can be found&lt;/a&gt; on the author&#39;s blog, but I think it is less of an explanation and more of an informal specification.&lt;/p&gt;
+
+&lt;p&gt;This blog post tries to explain it such that anybody (even new beginners) can understand and implement it.&lt;/p&gt;
+
+&lt;h1 id=&#34;linear-smallinteger-code-lsic&#34;&gt;Linear small-integer code (LSIC)&lt;/h1&gt;
+
+&lt;p&gt;The first part of LZ4 we need to explain is a smart but simple integer encoder. It is very space efficient for 0-255, and then grows linearly, based on the assumption that the integers used with this encoding rarely exceeds this limit, as such it is only used for small integers in the standard.&lt;/p&gt;
+
+&lt;p&gt;It is a form of addition code, in which we read a byte. If this byte is the maximal value (255), another byte is read and added to the sum. This process is repeated until a byte below 255 is reached, which will be added to the sum, and the sequence will then end.&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/lz4_int_encoding_flowchart.svg&#34; alt=&#34;We try to fit it into the next cluster.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;In short, we just keep adding bytes and stop when we hit a non-0xFF byte.&lt;/p&gt;
+
+&lt;p&gt;We&#39;ll use the name &amp;quot;LSIC&amp;quot; for convinience.&lt;/p&gt;
+
+&lt;h1 id=&#34;block&#34;&gt;Block&lt;/h1&gt;
+
+&lt;p&gt;An LZ4 stream is divided into segments called &amp;quot;blocks&amp;quot;. Blocks contains a literal which is to be copied directly to the output stream, and then a back reference, which tells us to copy some number of bytes from the already decompressed stream.&lt;/p&gt;
+
+&lt;p&gt;This is really were the compression is going on. Copying from the old stream allows deduplication and runs-length encoding.&lt;/p&gt;
+
+&lt;h2 id=&#34;overview&#34;&gt;Overview&lt;/h2&gt;
+
+&lt;p&gt;A block looks like:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\overbrace{\underbrace{t_1}_\text{4 bits}\  \underbrace{t_2}_\text{4 bits}}^\text{Token} \quad \underbrace{\overbrace{e_1}^\texttt{LISC}}_\text{If $t_1 = 15$} \quad \underbrace{\overbrace{L}^\text{Literal}}_{t_1 + e\text{ bytes }} \quad \overbrace{\underbrace{O}_\text{2 bytes}}^\text{Little endian} \quad \underbrace{\overbrace{e_2}^\texttt{LISC}}_\text{If $t_2 = 15$}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;And decodes to the &lt;span  class=&#34;math&#34;&gt;\(L\)&lt;/span&gt; segment, followed by a &lt;span  class=&#34;math&#34;&gt;\(t_2 + e_2 + 4\)&lt;/span&gt; bytes sequence copied from position &lt;span  class=&#34;math&#34;&gt;\(l - O\)&lt;/span&gt; from the output buffer (where &lt;span  class=&#34;math&#34;&gt;\(l\)&lt;/span&gt; is the length of the output buffer).&lt;/p&gt;
+
+&lt;p&gt;We will explain all of these in the next sections.&lt;/p&gt;
+
+&lt;h2 id=&#34;token&#34;&gt;Token&lt;/h2&gt;
+
+&lt;p&gt;Any block starts with a 1 byte token, which is divided into two 4-bit fields.&lt;/p&gt;
+
+&lt;h2 id=&#34;literals&#34;&gt;Literals&lt;/h2&gt;
+
+&lt;p&gt;The first (highest) field in the token is used to define the literal. This obviously takes a value 0-15.&lt;/p&gt;
+
+&lt;p&gt;Since we might want to encode higher integer, as such we make use of LSIC encoding: If the field is 15 (the meximal value), we read an integer with LSIC and add it to the original value (15) to obtain the literals length.&lt;/p&gt;
+
+&lt;p&gt;Call the final value &lt;span  class=&#34;math&#34;&gt;\(L\)&lt;/span&gt;.&lt;/p&gt;
+
+&lt;p&gt;Then we forward the next &lt;span  class=&#34;math&#34;&gt;\(L\)&lt;/span&gt; bytes from the input stream to the output stream.&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/lz4_literals_copy_diagram.svg&#34; alt=&#34;We copy from the buffer directly.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;deduplication&#34;&gt;Deduplication&lt;/h2&gt;
+
+&lt;p&gt;The next few bytes are used to define some segment in the already decoded buffer, which is going to be appended to the output buffer.&lt;/p&gt;
+
+&lt;p&gt;This allows us to transmit a position and a length to read from in the already decoded buffer instead of transmitting the literals themself.&lt;/p&gt;
+
+&lt;p&gt;To start with, we read a 16-bit little endian integer. This defines the so called offset, &lt;span  class=&#34;math&#34;&gt;\(O\)&lt;/span&gt;. It is important to understand that the offset is not the starting position of the copied buffer. This starting point is calculated by &lt;span  class=&#34;math&#34;&gt;\(l - O\)&lt;/span&gt; with &lt;span  class=&#34;math&#34;&gt;\(l\)&lt;/span&gt; being the number of bytes already decoded.&lt;/p&gt;
+
+&lt;p&gt;Secondly, similarly to the literals length, if &lt;span  class=&#34;math&#34;&gt;\(t_2\)&lt;/span&gt; is 15 (the maximal value), we use LSIC to &amp;quot;extend&amp;quot; this value and we add the result. This plus 4 yields the number of bytes we will copy from the output buffer. The reason we add 4 is because copying less than 4 bytes would result in a negative expansion of the compressed buffer.&lt;/p&gt;
+
+&lt;p&gt;Now that we know the start position and the length, we can append the segment to the buffer itself:&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/lz4_deduplicating_diagram.svg&#34; alt=&#34;Copying in action.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;It is important to understand that the end of the segment might not be initializied before the rest of the segment is appended, because overlaps are allowed. This allows a neat trick, namely &amp;quot;runs-length encoding&amp;quot;, where you repeat some sequence a given number of times:&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/lz4_runs_encoding_diagram.svg&#34; alt=&#34;We repeat the last byte.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;Note that the duplicate section is not required if you&#39;re in the end of the stream, i.e. if there&#39;s no more compressed bytes to read.&lt;/p&gt;
+
+&lt;h1 id=&#34;compression&#34;&gt;Compression&lt;/h1&gt;
+
+&lt;p&gt;Until now, we have only considered decoding, not the reverse process.&lt;/p&gt;
+
+&lt;p&gt;A dozen of approaches to compression exists. They have the aspects that they need to be able to find duplicates in the already input buffer.&lt;/p&gt;
+
+&lt;p&gt;In general, there are two classes of such compression algorithms:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;HC: High-compression ratio algorithms, these are often very complex, and might include steps like backtracking, removing repeatation, non-greediy.&lt;/li&gt;
+&lt;li&gt;FC: Fast compression, these are simpler and faster, but provides a slightly worse compression ratio.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;We will focus on the FC-class algorithms.&lt;/p&gt;
+
+&lt;p&gt;Binary Search Trees (often B-trees) are often used for searching for duplicates. In particular, every byte iterated over will add a pointer to the rest of the buffer to a B-tree, we call the &amp;quot;duplicate tree&amp;quot;. Now, B-trees allows us to retrieve the largest element smaller than or equal to some key. In lexiographic ordering, this is equivalent to asking the element sharing the largest number of bytes as prefix.&lt;/p&gt;
+
+&lt;p&gt;For example, consider the table:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;abcdddd =&amp;gt; 0
+bcdddd  =&amp;gt; 1
+cdddd   =&amp;gt; 2
+dddd    =&amp;gt; 3
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;If we search for &lt;code&gt;cddda&lt;/code&gt;, we&#39;ll get a partial match, namely &lt;code&gt;cdddd =&amp;gt; 2&lt;/code&gt;. So we can quickly find out how many bytes they have in common as prefix. In this case, it is 4 bytes.&lt;/p&gt;
+
+&lt;p&gt;What if we found no match or a bad match (a match that shares less than some threshold)? Well, then we write it as literal until a good match is found.&lt;/p&gt;
+
+&lt;p&gt;As you may notice, the dictionary grows linearly. As such, it is important that you reduce memory once in a while, by trimming it. Note that just trimming the first (or last) &lt;span  class=&#34;math&#34;&gt;\(N\)&lt;/span&gt; entries is inefficient, because some might be used often. Instead, a &lt;a href=&#34;https://en.wikipedia.org/wiki/Cache_Replacement_Policies&#34;&gt;cache replacement policy&lt;/a&gt; should be used. If the dictionary is filled, the cache replacement policy should determine which match should be replaced. I&#39;ve found PLRU a good choice of CRP for LZ4 compression.&lt;/p&gt;
+
+&lt;p&gt;Note that you should add additional rules like being addressible (within &lt;span  class=&#34;math&#34;&gt;\(2^{16} + 4\)&lt;/span&gt; bytes of the cursor, which is required because &lt;span  class=&#34;math&#34;&gt;\(O\)&lt;/span&gt; is 16-bit) and being above some length (smaller keys have worse block-level compression ratio).&lt;/p&gt;
+
+&lt;p&gt;Another faster but worse (compression-wise) approach is hashing every four bytes and placing them in a table. This means that you can only look up the latest sequence given some 4-byte prefix. Looking up allows you to progress and see how long the duplicate sequence match. When you can&#39;t go any longer, you encode the literals section until another duplicate 4-byte is found.&lt;/p&gt;
+
+&lt;h1 id=&#34;conclusion&#34;&gt;Conclusion&lt;/h1&gt;
+
+&lt;p&gt;LZ4 is a reasonably simple algorithm with reasonably good compression ratio. It is the type of algorithm that you can implement on an afternoon without much complication.&lt;/p&gt;
+
+&lt;p&gt;If you need a portable and efficient compression algorithm which can be implement in only a few hundreds of lines, LZ4 would be my go-to.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>On Random-Access Compression</title>
+      <link>http://ticki.github.io/blog/on-random-access-compression/</link>
+      <pubDate>Sun, 23 Oct 2016 23:25:15 +0200</pubDate>
+      
+      <guid>http://ticki.github.io/blog/on-random-access-compression/</guid>
+      <description>&lt;script type=&#34;text/javascript&#34;
+  src=&#34;https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&#34;&gt;
+&lt;/script&gt;
+
+&lt;p&gt;This post will contains an algorithm I came up with, doing efficient rolling compression. It&#39;s going to be used in &lt;a href=&#34;https://github.com/ticki/tfs&#34;&gt;TFS&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h1 id=&#34;what-is-rolling-compression&#34;&gt;What is rolling compression?&lt;/h1&gt;
+
+&lt;p&gt;Consider that you have a large file and you want to compress it. That&#39;s easy enough and many algorithms exists for doing so. Now, consider that you want to read or write a small part of the file.&lt;/p&gt;
+
+&lt;p&gt;Most algorithms would require you to decompress, write, and recompress the whole file. Clearly, this gets expensive when the file is big.&lt;/p&gt;
+
+&lt;h1 id=&#34;clusterbased-compression&#34;&gt;Cluster-based compression&lt;/h1&gt;
+
+&lt;p&gt;A cluster is some small fixed-size block (often 512, 1024, or 4096 bytes). We can have a basic cluster allocator by linking unused clusters together. Cluster-centric compression is interesting, because it can exploit the allocator.&lt;/p&gt;
+
+&lt;p&gt;So, the outline is that we compress every &lt;span  class=&#34;math&#34;&gt;\(n\)&lt;/span&gt; adjacent clusters to some &lt;span  class=&#34;math&#34;&gt;\(n&#39; &lt; n%&gt;\)&lt;/span&gt;, then we can free the excessive clusters in this compressed line.&lt;/p&gt;
+
+&lt;h1 id=&#34;copyonwrite&#34;&gt;Copy-on-write&lt;/h1&gt;
+
+&lt;p&gt;Our algorithm is not writable, but it can be written by allocating, copying, and deallocating. This is called copy-on-write, or COW for short. It is a common technique used in many file systems.&lt;/p&gt;
+
+&lt;p&gt;Essentially, we never write a cluster. Instead, we allocate a new cluster, and copy the data to it. Then we deallocate the old cluster.&lt;/p&gt;
+
+&lt;p&gt;This allows us to approach everything much more functionally, and we thus don&#39;t have to worry about make compressible blocks uncompressible (consider that you overwrite a highly compressible cluster with random data, then you extend a physical cluster containing many virtual clusters, these wouldn&#39;t be possible to have in one cluster).&lt;/p&gt;
+
+&lt;h1 id=&#34;physical-and-virtual-clusters&#34;&gt;Physical and virtual clusters&lt;/h1&gt;
+
+&lt;p&gt;Our goal is really fit multiple clusters into one physical cluster. Therefore, it is essential to distinguish between physical (the stored) and virtual (the compressed) clusters.&lt;/p&gt;
+
+&lt;p&gt;A physical cluster can contain up to 8 virtual clusters. A pointer to a virtual cluster starts with 3 bits defining the index into the physical cluster, which is defined by the rest of the pointer.&lt;/p&gt;
+
+&lt;p&gt;The allocated physical cluster contains 8 bitflags, defining which of the 8 virtual clusters in the physical cluster are used. This allows us to know how many virtual clusters we need to go over before we get the target decompressed cluster.&lt;/p&gt;
+
+&lt;p&gt;When the integer hits zero (i.e. all the virtual clusters are freed), the physical cluster is freed.&lt;/p&gt;
+
+&lt;p&gt;Since an active cluster will never have the state zero, we use this blind state to represent an uncompressed physical cluster. This means we maximally have one byte in space overhead for uncompressible clusters.&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/virtual_physical_random_access_compression_diagram.svg&#34; alt=&#34;A diagram&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;h1 id=&#34;the-physical-cluster-allocator&#34;&gt;The physical cluster allocator&lt;/h1&gt;
+
+&lt;p&gt;The cluster allocator is nothing but a linked list of clusters. Every free cluster links to another free cluster or NIL (no more free clusters).&lt;/p&gt;
+
+&lt;p&gt;This method is called SLOB (Simple List Of Objects) and has the advantage of being complete zero-cost in that there is no wasted space.&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/slob_allocation_diagram.svg&#34; alt=&#34;Physical allocation is simply linked list of free objects.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;h1 id=&#34;the-virtual-cluster-allocator&#34;&gt;The virtual cluster allocator&lt;/h1&gt;
+
+&lt;p&gt;Now we hit the meat of the matter.&lt;/p&gt;
+
+&lt;p&gt;When virtual cluster is allocated, we read from the physical cluster list. The first thing we will check is if we can fit in our virtual cluster into the cluster next to the head of the list (we wrap if we reach the end).&lt;/p&gt;
+
+&lt;p&gt;If we can fit it in &lt;em&gt;and&lt;/em&gt; we have less than 8 virtual clusters in this physical cluster, we will put it into the compressed physical cluster at the first free virtual slot (and then set the respective bitflag):&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/allocating_compressed_virtual_page_into_next_diagram.svg&#34; alt=&#34;We try to fit it into the next cluster.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;If we cannot, we pop the list and use the fully-free physical cluster to store etablish a new stack of virtual clusters. It starts as uncompressed:&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/pop_and_create_new_uncompressed_cluster_diagram.svg&#34; alt=&#34;We pop the list and put the virtual cluster in the physical uncompressed slot.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;h1 id=&#34;properties-of-this-approach&#34;&gt;Properties of this approach&lt;/h1&gt;
+
+&lt;p&gt;This approach to writable random-access compression has some very nice properties.&lt;/p&gt;
+
+&lt;h2 id=&#34;compression-miss&#34;&gt;Compression miss&lt;/h2&gt;
+
+&lt;p&gt;We call it a compression miss when we need to pop from the freelist (i.e. we cannot fit it into the cluster next to the head). When you allocate you can maximally have one compression miss, and therefore allocation is constant-time.&lt;/p&gt;
+
+&lt;h2 id=&#34;every-cluster-has-a-sister-cluster&#34;&gt;Every cluster has a sister cluster&lt;/h2&gt;
+
+&lt;p&gt;Because the &amp;quot;next cluster or wrap&amp;quot; function is bijective, we&#39;re sure that we try to insert a virtual cluster to every cluster at least once. This wouldn&#39;t be true if we used a hash function or something else.&lt;/p&gt;
+
+&lt;p&gt;This has the interesting consequence that filled clusters won&#39;t be tried to allocate in multiple times.&lt;/p&gt;
+
+&lt;h1 id=&#34;limitations&#34;&gt;Limitations&lt;/h1&gt;
+
+&lt;p&gt;A number of limitations are in this algorithms. The first and most obvious one is the limitation on the compression ratio. This is a minor one: it limits the ratio to maxmially slightly less than 1:8.&lt;/p&gt;
+
+&lt;p&gt;A more important limitation is fragmentation. If I allocate many clusters and then deallocate some of them such that many adjacent physical clusters only contain one virtual cluster, this row will have a compression ratio of 1:1 until they&#39;re deallocated. Note that it is very rare that this happens, and will only marginally affect the global compression ratio.&lt;/p&gt;
+
+&lt;h1 id=&#34;update-an-idea&#34;&gt;Update: An idea&lt;/h1&gt;
+
+&lt;p&gt;A simple trick can improve performance in some cases. Instead of compressing all the virtual clusters in a physical cluster together, you should compress each virtual cluster seperately and place them sequentially (with some delimiter) in the physical cluster.&lt;/p&gt;
+
+&lt;p&gt;If your compression algorithm is streaming, you can much faster iterate to the right delimiter, and then only decompress that virtual cluster.&lt;/p&gt;
+
+&lt;p&gt;This has the downside of making the compression ratio worse. One solution is to have an initial dictionary (if using a dictionary-based compression algorithm).&lt;/p&gt;
+
+&lt;p&gt;Another idea is to eliminate the cluster state and replace it by repeated delimiters. I need to investigate this some more with benchmarks and so on in order to tell if this is actually superior to having a centralized cluster state.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

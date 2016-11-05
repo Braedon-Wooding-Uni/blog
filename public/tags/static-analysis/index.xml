@@ -1,0 +1,450 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Static Analysis on Ticki&#39;s blog</title>
+    <link>http://ticki.github.io/tags/static-analysis/</link>
+    <description>Recent content in Static Analysis on Ticki&#39;s blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 24 Sep 2016 00:00:00 +0000</lastBuildDate>
+    <atom:link href="http://ticki.github.io/tags/static-analysis/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>A Hoare Logic for Rust</title>
+      <link>http://ticki.github.io/blog/a-hoare-logic-for-rust/</link>
+      <pubDate>Sat, 24 Sep 2016 00:00:00 +0000</pubDate>
+      
+      <guid>http://ticki.github.io/blog/a-hoare-logic-for-rust/</guid>
+      <description>&lt;script type=&#34;text/javascript&#34;
+  src=&#34;https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&#34;&gt;
+&lt;/script&gt;
+
+&lt;p&gt;Lately, I&#39;ve been working on a Hoare-logic-based model of the Rust MIR, which I will introduce in the post. This is a minor step towards a memory model of Rust, and it allows formalization of programs and their behavior.&lt;/p&gt;
+
+&lt;p&gt;This project was born out of the effort to formalize &lt;a href=&#34;https://github.com/redox-os/redox&#34;&gt;the Redox kernel&lt;/a&gt; and &lt;a href=&#34;https://github.com/redox-os/ralloc/tree/skiplist&#34;&gt;the ralloc memory allocator&lt;/a&gt; as well as coming up with a &lt;a href=&#34;https://github.com/rust-lang/rfcs/issues/1447&#34;&gt;Rust memory model&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Here I will walk through the techniques, axioms, and transformations in detail. I&#39;ve divided this post into three parts:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;An introduction to Hoare logic: An gentle introduction for the beginners (can be skipped if you&#39;re already familiar with Hoare logic).&lt;/li&gt;
+&lt;li&gt;Applying Hoare logic to the Rust MIR: Notably dropping structured programming in favour of a lower-level goto-based representation, and how it helps simplifying certain things.&lt;/li&gt;
+&lt;li&gt;Reasoning about pointers: Pointers are notoriously hard to reason about. Here we try to formalize their behavior and give various insight on how they can be reasoned about. Priory to this part, we assume that pointers doesn&#39;t exist.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;This blog post is not a formal specification or a paper, but rather a mere introduction to the subject and proposed axioms.&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;If the math doesn&#39;t show up properly, reload the page.&lt;/em&gt;&lt;/p&gt;
+
+&lt;h1 id=&#34;an-introduction-to-hoare-logic&#34;&gt;An introduction to Hoare logic&lt;/h1&gt;
+
+&lt;p&gt;So, what is Hoare logic? Well, it&#39;s a set of axioms and inference rules allowing one to reason about &lt;em&gt;imperative programs&lt;/em&gt; in a rigorous manner.&lt;/p&gt;
+
+&lt;p&gt;The program is divided into so called &lt;strong&gt;Hoare triples&lt;/strong&gt;, denoted &lt;span  class=&#34;math&#34;&gt;\(\{P\} \ S \ \{Q\}\)&lt;/span&gt;. &lt;span  class=&#34;math&#34;&gt;\(P\)&lt;/span&gt; is called the &amp;quot;precondition&amp;quot;. Informally, if &lt;span  class=&#34;math&#34;&gt;\(P\)&lt;/span&gt; is satisfied, then after &lt;span  class=&#34;math&#34;&gt;\(S\)&lt;/span&gt; (the statement or instruction) has been executed, &lt;span  class=&#34;math&#34;&gt;\(Q\)&lt;/span&gt; (the postcondition) should be true. In other words, &lt;span  class=&#34;math&#34;&gt;\(P\)&lt;/span&gt; is true before &lt;span  class=&#34;math&#34;&gt;\(S\)&lt;/span&gt;, and &lt;span  class=&#34;math&#34;&gt;\(Q\)&lt;/span&gt; should be true after.&lt;/p&gt;
+
+&lt;p&gt;In fact, we can view &lt;span  class=&#34;math&#34;&gt;\(S\)&lt;/span&gt; as a function on the state space, going from &lt;span  class=&#34;math&#34;&gt;\(\sigma\)&lt;/span&gt; satisfying property &lt;span  class=&#34;math&#34;&gt;\(P(\sigma)\)&lt;/span&gt; to a state &lt;span  class=&#34;math&#34;&gt;\(S(\sigma) = \sigma&#39;\)&lt;/span&gt; satisfying the postcondition, &lt;span  class=&#34;math&#34;&gt;\(Q(\sigma&#39;)\)&lt;/span&gt;.&lt;/p&gt;
+
+&lt;p&gt;Thus a Hoare triple can be seen as a 3-tuple&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[(P, f, Q)\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;satisfying:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[P(\sigma) \to Q(f(\sigma))\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;It turns out that this interpretation is a strong one, and we will use it throughout the post to derive the Hoare rules, some of which follows directly from this interpretation.&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{\forall \sigma.P(\sigma) \to Q(f(\sigma))}{\{P\}\ f\ \{Q\}} \qquad \frac{\{P\}\ f\ \{Q\}}{\forall \sigma.P(\sigma) \to Q(f(\sigma))}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;(on a side note, this notation should be understood as: what is below the line is true if what is above is true)&lt;/p&gt;
+
+&lt;h2 id=&#34;an-example&#34;&gt;An example&lt;/h2&gt;
+
+&lt;p&gt;Suppose we have the program,&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;// a = 4
+a += 2;
+// a = 6
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This is expressed by the Hoare triple&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\{a = 4\} \ a \gets a + 2 \ \{a = 6\}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;So far, we have only introduced the notation, which in itself is worthless, what&#39;s really the core is the rules that allows us to reason about valid Hoare triples. We need a way to essentially construct new Hoare triples from old ones.&lt;/p&gt;
+
+&lt;h2 id=&#34;rules-and-axioms&#34;&gt;Rules and axioms&lt;/h2&gt;
+
+&lt;h3 id=&#34;empty-statement-rule&#34;&gt;Empty statement rule&lt;/h3&gt;
+
+&lt;p&gt;The empty statement rule states that: Let &lt;span  class=&#34;math&#34;&gt;\(S\)&lt;/span&gt; be any statement which carries no side-effect, then &lt;span  class=&#34;math&#34;&gt;\(\{P\} \ S \ \{P\}\)&lt;/span&gt;, or in inference line notation:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{S \text{ is pure}}{\{P\} \ S \ \{P\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;This rule is relatively simple: If the state is not changed, the invariants are neither. Note that this is only true for effect-less statements, since the statement could otherwise change variables or in other ways invalidate the postcondition.&lt;/p&gt;
+
+&lt;p&gt;In fact, we can express it in terms of the identity function, &lt;span  class=&#34;math&#34;&gt;\(f(x)=x\)&lt;/span&gt;. Then,&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[P(x) \to P(f(x)) = P(x)\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;Hence, the triple is valid.&lt;/p&gt;
+
+&lt;h3 id=&#34;composition-rule&#34;&gt;Composition rule&lt;/h3&gt;
+
+&lt;p&gt;The composition rule allows you to concatenate two statements (into a Hoare triple) if the first statement&#39;s postcondition is equal to the second statement&#39;s precondition:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{\{P\}\ S\ \{Q\}, \quad \{Q\}\ T\ \{R\}}{\{P\}\ S;T\ \{R\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;It is left as an exercise for the reader to verify the correctness of the rule above.&lt;/p&gt;
+
+&lt;h3 id=&#34;strengthening-and-weakening-conditions&#34;&gt;Strengthening and weakening conditions&lt;/h3&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{P_1 \to P_2,\quad \{P_2\}\ S\ \{Q_2\},\quad Q_2 \to Q_1}{\{P_1\}\ S\ \{Q_1\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;So, what&#39;s going on here? Well, &lt;span  class=&#34;math&#34;&gt;\(P_1\)&lt;/span&gt; implies &lt;span  class=&#34;math&#34;&gt;\(P_2\)&lt;/span&gt;, so we can replace the precondition by a stronger version which implies the old one. The same cannot be applied to postcondition, because the strengthened precondition might not yield the strengthened postcondition after the statement. We can however replace it by a weaker postcondition (i.e. one which is implied by original postcondition).&lt;/p&gt;
+
+&lt;p&gt;We can always weaken guarantees, but never assumptions, since the assumption is what the guarantee relies on. Assumptions can be made stronger, however.&lt;/p&gt;
+
+&lt;p&gt;It is left as an exercise for the reader to verify the correctness of the rule above.&lt;/p&gt;
+
+&lt;h3 id=&#34;the-assignment-axiom&#34;&gt;The assignment axiom&lt;/h3&gt;
+
+&lt;p&gt;This axiom is the most important. It allows for reasoning about preconditions in the case of assignments. It is absolutely essential to Hoare logic.&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{}{\{P[x \gets E]\}\ x \gets E\ \{P\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\(P[x \gets E]\)&lt;/span&gt; denotes replacing every free (unbound) &lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt; with &lt;span  class=&#34;math&#34;&gt;\(E\)&lt;/span&gt;.&lt;/p&gt;
+
+&lt;p&gt;Let&#39;s say &lt;span  class=&#34;math&#34;&gt;\(P\)&lt;/span&gt; involves some assertion about &lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt;, then we can move it over the assignment (to the precondition) replacing &lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt; with the right-hand-side of the assignment, because every occurence of &lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt; represents said value anyway, so substituting the value &lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt; represents for &lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt; won&#39;t change the structure.&lt;/p&gt;
+
+&lt;p&gt;Let&#39;s say we have the statement, &lt;span  class=&#34;math&#34;&gt;\(x \gets x + 2\)&lt;/span&gt;, with the postcondition &lt;span  class=&#34;math&#34;&gt;\(\{x = 6\}\)&lt;/span&gt;, we can then derive the Hoare triple:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\{x + 2 = 6\}\ x \gets x + 2\ \{x = 6\}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;One thing that is surprising, but also incredibly important, is that you substitute it into the precondition and not the postcondition. To see why such a rule (&lt;span  class=&#34;math&#34;&gt;\(\{P\}\ x \gets E\ \{P[x \gets E]\}\)&lt;/span&gt;) would be wrong, observe how you could derive &lt;span  class=&#34;math&#34;&gt;\(\{x = 1\}\ x \gets 2\ \{2 = 1\}\)&lt;/span&gt;, which is clearly false.&lt;/p&gt;
+
+&lt;p&gt;It is also worth noting that, in this context, expressions cannot carry side-effects. We&#39;ll cover this in detail in part two.&lt;/p&gt;
+
+&lt;h3 id=&#34;conditional-rule&#34;&gt;Conditional rule&lt;/h3&gt;
+
+&lt;p&gt;So far, we have only covered a simple language without loops, conditionals, and other forms of branches.&lt;/p&gt;
+
+&lt;p&gt;The first (and simplest) form of branches is a conditional non-cyclic branch (&lt;code&gt;if&lt;/code&gt;). These behaves in a very simple way:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{\{C \land P\}\ B\ \{Q\},\quad \{\neg C \land P\}\ E\ \{Q\}}{\{P\}\ \textbf{if } C \textbf{ then } B \textbf{ else } E \textbf{ end}\ \{Q\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;As complex this looks, it&#39;s actually relatively simple:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;In your &lt;code&gt;if&lt;/code&gt; statement&#39;s body, you can safely assume the &lt;code&gt;if&lt;/code&gt; condition to be true.&lt;/li&gt;
+&lt;li&gt;If both branches shares their postcondition (&lt;span  class=&#34;math&#34;&gt;\(Q\)&lt;/span&gt;), then the &lt;code&gt;if&lt;/code&gt; statement does as well.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;As an example, consider the code,&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;if x == 4 {
+    // I can safely assume that x = 4 here.
+    ...
+    x = 2;
+    // Now x = 2.
+} else {
+    // I can safely assume that x ≠ 4 here.
+    ...
+    x = 2;
+    // Now x = 2.
+}
+// All branches share postcondition, so the whole if-statement does as well: x = 2
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h3 id=&#34;the-loop-rule&#34;&gt;The loop rule&lt;/h3&gt;
+
+&lt;p&gt;The loop rule reads,&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{\{I \land C\}\ B\ \{I\}}{\{I\}\ \textbf{while } C \textbf{ do } B \textbf{ done}\ \{I \land \neg C\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\(I\)&lt;/span&gt; is called the &lt;em&gt;loop invariant&lt;/em&gt;, i.e. the condition which is true before and after the loop. The loop will terminate when &lt;span  class=&#34;math&#34;&gt;\(\neg C\)&lt;/span&gt;, hence the postcondition of the loop.&lt;/p&gt;
+
+&lt;p&gt;As a simple example, take the following code:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;let mut x = 3;
+let mut y = 4;
+// Precondition: x == 3 (loop invariant)
+while y &amp;lt; 100 {
+    // Precondition: y &amp;lt; 100 &amp;amp;&amp;amp; x == 3
+    y += 1;
+    // Posttcondition: x == 3 (loop invariant)
+}
+// Postcondition: !(y &amp;lt; 100) ⇒ y &amp;gt;= 100
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h1 id=&#34;applying-hoare-logic-to-the-mir&#34;&gt;Applying Hoare logic to the MIR&lt;/h1&gt;
+
+&lt;p&gt;The Rust MIR is in many ways an interesting language. It can be seen as an extremely stripped-down version of Rust. What we&#39;ll work with is the MIR from the last compiler pass.&lt;/p&gt;
+
+&lt;h2 id=&#34;the-rust-mir&#34;&gt;The Rust MIR&lt;/h2&gt;
+
+&lt;p&gt;The Rust MIR has no structural control flow. It directly resembles the CFG of the program.&lt;/p&gt;
+
+&lt;p&gt;There are three concepts we must be familiar with to understand the Rust MIR:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Functions&lt;/strong&gt;: A graph.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Basic blocks&lt;/strong&gt;: The nodes in the graph.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Terminators&lt;/strong&gt;: The edges in the graph.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;We&#39;ll not get into the representation of scopes and type information the MIR contains.&lt;/p&gt;
+
+&lt;h3 id=&#34;functions&#34;&gt;Functions&lt;/h3&gt;
+
+&lt;p&gt;Taking aside the type information, functions have two components: A set of variables and a Control Flow Graph.&lt;/p&gt;
+
+&lt;p&gt;The function starts with a bunch of variable declarations (arguments, temporaries, and variables). There&#39;s one implicit variable, the &lt;code&gt;return&lt;/code&gt; variable, which contains the return values.&lt;/p&gt;
+
+&lt;p&gt;Secondly, there&#39;s a set of basic blocks, as well as a starting block.&lt;/p&gt;
+
+&lt;h3 id=&#34;basic-blocks&#34;&gt;Basic blocks&lt;/h3&gt;
+
+&lt;p&gt;Basic blocks are the nodes of the CFG. They each represent a series of statements. In our model, we can wlog. assume that a statement is simply an assignment, &lt;span  class=&#34;math&#34;&gt;\(x \gets y\)&lt;/span&gt;, where &lt;span  class=&#34;math&#34;&gt;\(y\)&lt;/span&gt; is an operand. In other words, a basic block is of the form &lt;span  class=&#34;math&#34;&gt;\((x_1 \gets y_1; x_2 \gets y_2; \ldots; x_n \gets y_n, t)\)&lt;/span&gt; with &lt;span  class=&#34;math&#34;&gt;\(t\)&lt;/span&gt; being the terminator.&lt;/p&gt;
+
+&lt;p&gt;In fact, we can go even further: A statement is a single assignment. This can be shown by simply constructing a map between the two graphs (by using the goto terminator to chain).&lt;/p&gt;
+
+&lt;p&gt;Note that there are two kinds of assignments. Up until now, we have only considered the &lt;em&gt;simple assignment&lt;/em&gt; &lt;span  class=&#34;math&#34;&gt;\(x \gets y\)&lt;/span&gt; with &lt;span  class=&#34;math&#34;&gt;\(y\)&lt;/span&gt; being a simple, effectless expression. There&#39;s actually a second form of assignment, the function call assignment, &lt;span  class=&#34;math&#34;&gt;\(x \gets f(y)\)&lt;/span&gt;.&lt;/p&gt;
+
+&lt;p&gt;In such an assignment, the function can change the state of the program, and thus care must be taken, since you cannot always use the assignment axiom. We&#39;ll get back to that later on.&lt;/p&gt;
+
+&lt;h3 id=&#34;terminators&#34;&gt;Terminators&lt;/h3&gt;
+
+&lt;p&gt;Terminators are what binds basic blocks together. Every basic block has an associated terminator, which takes one of the following forms:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Return from the current function: &lt;span  class=&#34;math&#34;&gt;\(\textbf{return}\)&lt;/span&gt;. The return value is stored in the &lt;code&gt;return&lt;/code&gt; variable.&lt;/li&gt;
+&lt;li&gt;Calling a diverging function (&amp;quot;transferring&amp;quot; to the function), &lt;span  class=&#34;math&#34;&gt;\(f(x)\)&lt;/span&gt;.&lt;/li&gt;
+&lt;li&gt;Non-conditionally jumping to another block &lt;span  class=&#34;math&#34;&gt;\(\textbf{goto}(b)\)&lt;/span&gt;.&lt;/li&gt;
+&lt;li&gt;Jumping to another block if a condition is true, &lt;span  class=&#34;math&#34;&gt;\(\textbf{if}_c(b_1, b_2)\)&lt;/span&gt;.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;(there is a few - in the implementation - we ignore in our model for simplification purposes)&lt;/p&gt;
+
+&lt;p&gt;Notice how none of these are structural. All are based around gotos. Not only does this simplify our analysis, but it&#39;s also more near to the machine representation.&lt;/p&gt;
+
+&lt;p&gt;As an example, let&#39;s write a program that finds the 10th Fibonacci number:&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;https://i.imgur.com/gk6b2ZQ.png&#34; alt=&#34;Tenth Fibonacci number&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;First of all, the program starts by assigning starting values. Then it enters a loop with a conditional branch in the end (is 10 reached yet?). In this loop we do the classic, add the two numbers and shift one down. When the loops ends, we assign the return value, and then return from the function.&lt;/p&gt;
+
+&lt;h2 id=&#34;reasoning-about-the-mir&#34;&gt;Reasoning about the MIR&lt;/h2&gt;
+
+&lt;h3 id=&#34;unconditional-gotos&#34;&gt;Unconditional gotos&lt;/h3&gt;
+
+&lt;p&gt;The first rule is the non-structural equivalent of the composition rule. All it says is that for a goto-statement to be valid, the precondition of the target basic block must be true:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{\{P\}\ b_1\ \{Q\}, \quad \{Q\}\ b_2\ \{R\}}{\{P\}\ b_1; \textbf{goto}(b_2)\ \{R\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;h3 id=&#34;conditional-gotos&#34;&gt;Conditional gotos&lt;/h3&gt;
+
+&lt;p&gt;Conditional gotos are interesting in that it allows us to reason about both while-loops and if-statements in only run rule.&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{\{P \land C\}\ b_1\ \{Q\},\quad \{P \land \neg C\}\ b_2\ \{Q\}}{\{P\}\ \textbf{if}_C(b_1, b_2)\ \{Q\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;It is the non-structural equivalent of the conditional rule, we described earlier.&lt;/p&gt;
+
+&lt;h3 id=&#34;function-calls&#34;&gt;Function calls&lt;/h3&gt;
+
+&lt;p&gt;Functions take the form &lt;span  class=&#34;math&#34;&gt;\(f(x) \stackrel{\text{def}}{=} \{P(x)\}\ b\ \{Q(x)\}\)&lt;/span&gt;, i.e. an initial starting block, &lt;span  class=&#34;math&#34;&gt;\(b\)&lt;/span&gt;, and a precondition and postcondition, respectively.&lt;/p&gt;
+
+&lt;p&gt;The rule of correctness for function calls reads,&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{f(x) = \{P(x)\}\ b\ \{Q(x, \textbf{return})\}}{\{P(y) \land R[x \gets f(y)]\}\ x \gets f(y)\ \{Q(y, x) \land R\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;This one is a big one. Let&#39;s break it up:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;The assumption (above the inference line) states that &lt;span  class=&#34;math&#34;&gt;\(f(x)\)&lt;/span&gt; is a Hoare triple with the precondition and postcondition being terms depending on the argument.&lt;/li&gt;
+&lt;li&gt;The postcondition depends on the return value of &lt;span  class=&#34;math&#34;&gt;\(f(x)\)&lt;/span&gt; as well.&lt;/li&gt;
+&lt;li&gt;The conclusion (below the inference line) consists of a Hoare triple with an assignment to &lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt;.&lt;/li&gt;
+&lt;li&gt;The postcondition of the assignment is &lt;span  class=&#34;math&#34;&gt;\(Q(y, x)\)&lt;/span&gt; which express that the return value of the function is assigned to &lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt;, and the argument is &lt;span  class=&#34;math&#34;&gt;\(y\)&lt;/span&gt;. This is logically joined with &lt;span  class=&#34;math&#34;&gt;\(R\)&lt;/span&gt;, which is carried over to the other side:&lt;/li&gt;
+&lt;li&gt;The precondition consists of &lt;span  class=&#34;math&#34;&gt;\(R[x \gets f(y)]\)&lt;/span&gt;, in a similar manner to the assignment axiom, as well as &lt;span  class=&#34;math&#34;&gt;\(P(y)\)&lt;/span&gt;, the precondition of the function.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Note that this rule will be modified later when we introduce pointers into our model.&lt;/p&gt;
+
+&lt;p&gt;Take this imaginary program:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-rust&#34;&gt;fn subtract_without_overflow(a: u32, b: u32) -&amp;gt; u32 {
+    // Precondition: b ≤ a
+    a - b
+    // Postcondition: return ≤ a
+}
+
+fn main() {
+    let mut n = 0;
+    let mut res;
+    while n &amp;lt; 10 {
+        res = subtract_without_overflow(10, n);
+        // Postcondition: res &amp;lt; 10 (this is what we&#39;re going to prove!)
+        n += 1;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;We know here that the condition for the loop is &lt;span  class=&#34;math&#34;&gt;\(x &lt; 10\)&lt;/span&gt;, as such we set:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\begin{align*}
+x &amp;= \mathtt{res}\\
+y &amp;= (10, n)\\
+R &amp;= [\mathtt{res} &lt; 10]\\
+P((a, b)) &amp;= [b \leq a]\\
+Q((a, b), r) &amp;= [r \leq a]
+\end{align*}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;Plug it all in, and get:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{f(a, b) = \{n \leq a\}\ S\ \{f(a, b) \leq a\}}{\{n \leq 10 \land f(10, n) &lt; 10\}\ x \gets f(10, n)\ \{f(10, n) \leq 10 \land \mathtt{res} &lt; 10\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;The desired result is obtained: the precondition implies that &lt;span  class=&#34;math&#34;&gt;\(n &lt; 10\)&lt;/span&gt;, which is also the loop condition.&lt;/p&gt;
+
+&lt;!--  --&gt;
+
+&lt;p&gt;Thus, we can conclude that there is no overflow in the program. Cool, no?&lt;/p&gt;
+
+&lt;h3 id=&#34;dont-repeat-yourself&#34;&gt;Don&#39;t repeat yourself!&lt;/h3&gt;
+
+&lt;p&gt;The rest of the rules are exactly matching the &amp;quot;classical&amp;quot; Hoare logic axioms. In other words, the assignment axiom, skip axiom, and consequence axiom remains unchanged.&lt;/p&gt;
+
+&lt;h1 id=&#34;reasoning-about-pointers&#34;&gt;Reasoning about pointers&lt;/h1&gt;
+
+&lt;p&gt;This is a tricky subject. Pointers are notorious for being hard to reason about. In fact, they are probably the single hardest subject in program verification.&lt;/p&gt;
+
+&lt;h2 id=&#34;approach-1-global-reasoning&#34;&gt;Approach 1: Global reasoning&lt;/h2&gt;
+
+&lt;p&gt;We could simply consider memory as one big array, in which pointers are indexes, but it turns out such a model is not only non-local, but also very messy, as such we need to derive a more expressive and convenient model to be able to reason about pointers without too much hassle.&lt;/p&gt;
+
+&lt;h2 id=&#34;approach-2-relational-alias-analysis&#34;&gt;Approach 2: Relational alias analysis&lt;/h2&gt;
+
+&lt;p&gt;To start with, I&#39;ll introduce a model I call &amp;quot;relational alias analysis&amp;quot;. We define an equivalence relation, &lt;span  class=&#34;math&#34;&gt;\(\sim\)&lt;/span&gt;, on the set of variables. This equivalence relation tells if two variables are &lt;em&gt;aliased&lt;/em&gt; (i.e. pointers to the same location).&lt;/p&gt;
+
+&lt;h3 id=&#34;aliasing-variables&#34;&gt;Aliasing variables&lt;/h3&gt;
+
+&lt;p&gt;The first axiom reads,&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{\{x \sim y\}}{\{x = y\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;i.e. if two variables are aliased, they&#39;re equal.&lt;/p&gt;
+
+&lt;p&gt;This is perhaps more of a definition than an axiom. None the less, it describes the semantics of our alias relation.&lt;/p&gt;
+
+&lt;p&gt;Then we describe the behavior of alias asignments:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{}{\{A = \textbf{alias}(a)\}\ a \stackrel{\text{alias}}{\gets} b\ \{\textbf{alias}(a) = A \cup \{b\}\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;(&lt;span  class=&#34;math&#34;&gt;\(\textbf{alias}(x)\)&lt;/span&gt; defines the equivalence class of &lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt; under &lt;span  class=&#34;math&#34;&gt;\(\sim\)&lt;/span&gt;)&lt;/p&gt;
+
+&lt;p&gt;This allows for declaring a variable to be aliased with another variable.&lt;/p&gt;
+
+&lt;h3 id=&#34;assignment-axiom-for-aliased-values&#34;&gt;Assignment axiom for aliased values&lt;/h3&gt;
+
+&lt;p&gt;Preconditions and postconditions can contain statements on the value behind the pointer, which has the unfortunate consequence that the old assignment axiom schema is no longer valid.&lt;/p&gt;
+
+&lt;p&gt;In fact, we simply need to observe that previously, we had &lt;span  class=&#34;math&#34;&gt;\(\textbf{alias}(x) = \{x\}\)&lt;/span&gt;. Now that we introduced aliased values, the situation changed, and the equivalence class can be arbitrarily large.&lt;/p&gt;
+
+&lt;p&gt;We put,&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{}{\{P[\textbf{alias}(x) \gets E]\}\ x \gets E\ \{P\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;Note that &lt;span  class=&#34;math&#34;&gt;\(P[A \gets E]\)&lt;/span&gt; means that we replace every element &lt;span  class=&#34;math&#34;&gt;\(a \in A\)&lt;/span&gt; with &lt;span  class=&#34;math&#34;&gt;\(E\)&lt;/span&gt;.&lt;/p&gt;
+
+&lt;p&gt;In other words, we do the same as before except that we assign the value to &lt;em&gt;all&lt;/em&gt; the aliased variables.&lt;/p&gt;
+
+&lt;h3 id=&#34;insufficiency&#34;&gt;Insufficiency&lt;/h3&gt;
+
+&lt;p&gt;This model allows reasoning about aliases, but &lt;em&gt;not&lt;/em&gt; pointers in general. In fact, it cannot reason about &lt;code&gt;noalias&lt;/code&gt; pointers, deallocation, and pointer arithmetics.&lt;/p&gt;
+
+&lt;h2 id=&#34;approach-3-separation-logic&#34;&gt;Approach 3: Separation logic&lt;/h2&gt;
+
+&lt;p&gt;Separation logic was originally introduced by JC Reynolds in one of the most cited program verification papers ever. It is more complex than the alternative model we just presented, but also more expressive in some cases.&lt;/p&gt;
+
+&lt;h3 id=&#34;modeling-memory&#34;&gt;Modeling memory&lt;/h3&gt;
+
+&lt;p&gt;Our model of memory consists of multiple new notations. First of all, the model becomes memory aware. We use &lt;span  class=&#34;math&#34;&gt;\(p \mapsto x\)&lt;/span&gt; to denote that some pointer, &lt;span  class=&#34;math&#34;&gt;\(p\)&lt;/span&gt;, maps to the value &lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt;.&lt;/p&gt;
+
+&lt;p&gt;We use the notation &lt;span  class=&#34;math&#34;&gt;\(\mathcal{H}(p)\)&lt;/span&gt; to denote pointer reads. The reason we keep the notation function-like is because it is, in fact, just a function! It simply maps pointers to values. We can define,&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{p \mapsto x}{\mathcal{H}(p) = x}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;We denote pointer writes by &lt;span  class=&#34;math&#34;&gt;\(p \stackrel{\text{ptr}}{\gets} x\)&lt;/span&gt;.&lt;/p&gt;
+
+&lt;h4 id=&#34;disjointness&#34;&gt;Disjointness&lt;/h4&gt;
+
+&lt;p&gt;The first feature of separation logic is the notion of &amp;quot;separate conjunction&amp;quot;, denotes &lt;span  class=&#34;math&#34;&gt;\(P * Q\)&lt;/span&gt;.&lt;/p&gt;
+
+&lt;p&gt;This asserts that &lt;span  class=&#34;math&#34;&gt;\(P\)&lt;/span&gt; and &lt;span  class=&#34;math&#34;&gt;\(Q\)&lt;/span&gt; are both true and independent, i.e. their &amp;quot;heaps&amp;quot; are disjointed and not affected by the statement of the Hoare triple. In particular, let &lt;span  class=&#34;math&#34;&gt;\(A\)&lt;/span&gt; be the domain of &lt;span  class=&#34;math&#34;&gt;\(\mathcal{H}\)&lt;/span&gt;, then let &lt;span  class=&#34;math&#34;&gt;\(\{A_1, A_2\}\)&lt;/span&gt; be some semipartition of &lt;span  class=&#34;math&#34;&gt;\(A\)&lt;/span&gt; (&lt;span  class=&#34;math&#34;&gt;\(A_1 \cap A_2 = \emptyset\)&lt;/span&gt;), then put &lt;span  class=&#34;math&#34;&gt;\(A_1 = \textbf{ref}(P)\)&lt;/span&gt; and &lt;span  class=&#34;math&#34;&gt;\(A_b = \textbf{ref}(Q)\)&lt;/span&gt; (&lt;span  class=&#34;math&#34;&gt;\(\textbf{ref}(P)\)&lt;/span&gt; denotes all the locations that are referenced in &lt;span  class=&#34;math&#34;&gt;\(P\)&lt;/span&gt;, e.g. &lt;span  class=&#34;math&#34;&gt;\(\textbf{ref}([\mathcal{H}(x) = 3]) = \{x\}\)&lt;/span&gt;)&lt;/p&gt;
+
+&lt;p&gt;We can then put &lt;span  class=&#34;math&#34;&gt;\(P * Q\)&lt;/span&gt;. This might seem useless at first (how much different from &lt;span  class=&#34;math&#34;&gt;\(\land\)&lt;/span&gt; is it?), but it is incredibly important: If &lt;span  class=&#34;math&#34;&gt;\(P\)&lt;/span&gt; and &lt;span  class=&#34;math&#34;&gt;\(Q\)&lt;/span&gt; are dependent, not by sharing a free variable, but instead share a variable through aliasing (say &lt;span  class=&#34;math&#34;&gt;\(P\)&lt;/span&gt; has &lt;span  class=&#34;math&#34;&gt;\(x\)&lt;/span&gt; free and &lt;span  class=&#34;math&#34;&gt;\(Q\)&lt;/span&gt; has &lt;span  class=&#34;math&#34;&gt;\(y\)&lt;/span&gt; free, and &lt;span  class=&#34;math&#34;&gt;\(x \sim y\)&lt;/span&gt;).&lt;/p&gt;
+
+&lt;p&gt;All this will be formally defined in the next subsection.&lt;/p&gt;
+
+&lt;h4 id=&#34;the-frame-rule&#34;&gt;The frame rule&lt;/h4&gt;
+
+&lt;p&gt;The frame rule is the most important component of separation logic. It reads,&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{\textbf{mut}(C) \cap \textbf{free}(R) = \emptyset,\quad \{P\}\ C\ \{Q\}}{\{P * R\}\ C\ \{Q * R\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\(\textbf{mut}(C)\)&lt;/span&gt; means the set of variables &lt;span  class=&#34;math&#34;&gt;\(C\)&lt;/span&gt; &amp;quot;mutates&amp;quot; (changes) when executed. For example, &lt;span  class=&#34;math&#34;&gt;\(\textbf{mut}(a \gets b) = \{a\}\)&lt;/span&gt;.&lt;/p&gt;
+
+&lt;p&gt;What the rule says is that if &lt;span  class=&#34;math&#34;&gt;\(C\)&lt;/span&gt; never changes the &amp;quot;environment&amp;quot; from &lt;span  class=&#34;math&#34;&gt;\(R\)&lt;/span&gt;, then you can safely join the precondition and postcondition with &lt;span  class=&#34;math&#34;&gt;\(R\)&lt;/span&gt; of some Hoare triple with &lt;span  class=&#34;math&#34;&gt;\(C\)&lt;/span&gt;.&lt;/p&gt;
+
+&lt;h3 id=&#34;the-behavior-of-byreference-assignments&#34;&gt;The behavior of by-reference assignments&lt;/h3&gt;
+
+&lt;p&gt;The next thing we need is a way to reason about assignments behind pointers, or &amp;quot;pointer writes&amp;quot;. We use the term &amp;quot;by-reference assignments&amp;quot; to signify the similarities between normal assignments.&lt;/p&gt;
+
+&lt;p&gt;Starting by defining by-reference assignment, we add a rule allowing us to write to valid pointers:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{}{\{P * p \mapsto \bullet\}\ p \stackrel{\text{ptr}}{\gets} x\ \{P * p \mapsto x\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;Next, we need to specify the semantics of &lt;em&gt;reading&lt;/em&gt; from a pointer:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{\{P \land p \mapsto x\}\ k \gets \mathcal{H}(p)\ \{Q\}}{\{P \land p \mapsto x\}\ k \gets x\ \{Q\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;In other words, writing the data read from a pointer to a variable is equivalent to writing the value it&#39;s pointing to. This is more of a definition than an actual rule, because it is obvious, ignoring the notation.&lt;/p&gt;
+
+&lt;h3 id=&#34;allocation&#34;&gt;Allocation&lt;/h3&gt;
+
+&lt;p&gt;Allocation is what introduces a new heap store/pointer into the heap. And its behavior is relatively straight-forward:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{p \notin \textbf{free}(P)}{\{P\}\ p \gets \textbf{alloc}(s)\ \{P * p \to \bullet\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;Namely, if &lt;span  class=&#34;math&#34;&gt;\(p\)&lt;/span&gt; is not contained in &lt;span  class=&#34;math&#34;&gt;\(P\)&lt;/span&gt;, allocation creates a new, separate pointer. &lt;span  class=&#34;math&#34;&gt;\(\bullet\)&lt;/span&gt; denotes that the pointer is uninitialized or the value is unknown.&lt;/p&gt;
+
+&lt;h3 id=&#34;deallocation&#34;&gt;Deallocation&lt;/h3&gt;
+
+&lt;p&gt;As an example, take the dealloc function. This function obviously requires that there is no usage of the pointer later on (i.e. no use-after-free). We can express this in a relatively simple way:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\frac{}{\{P * p \mapsto x\}\ \textbf{dealloc}(p)\ \{P\}}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;The &lt;span  class=&#34;math&#34;&gt;\(*\)&lt;/span&gt; here express the independence of the content and validity of the pointer &lt;span  class=&#34;math&#34;&gt;\(p\)&lt;/span&gt;, which is really where separation logic shines: We can express pointer relation, and in this case, make sure that there is no usage of &lt;span  class=&#34;math&#34;&gt;\(p\)&lt;/span&gt; after the free.&lt;/p&gt;
+
+&lt;h3 id=&#34;pointers-on-the-stack&#34;&gt;Pointers on the stack&lt;/h3&gt;
+
+&lt;p&gt;In a formal model, the stack and the heap are not semantically different. In fact, we can interpret function calls as allocating the arguments onto the heap and deallocating them again when returning.&lt;/p&gt;
+
+&lt;h3 id=&#34;detecting-memory-leaks&#34;&gt;Detecting memory leaks&lt;/h3&gt;
+
+&lt;p&gt;In this model, it is surprisingly easy to prove your program leak-free. You simply have to put that the heap is empty in the postcondition and propagate it forward.&lt;/p&gt;
+
+&lt;h2 id=&#34;future-work-and-whats-next&#34;&gt;Future work and what&#39;s next&lt;/h2&gt;
+
+&lt;p&gt;Currently, I am writing a theorem extractor, which will generate the statement of correctness for some arbitrary program. This can then be fed into SMT solver and shown to be true.&lt;/p&gt;
+
+&lt;p&gt;Another aspect is the compilation itself, which must be a verified process, as such I am working on a compiler and formal proof of correctness of said compiler.&lt;/p&gt;
+
+&lt;p&gt;Lastly, I can formally verify Ralloc and Redox.&lt;/p&gt;
+
+&lt;h2 id=&#34;conclusion-and-final-words&#34;&gt;Conclusion and final words&lt;/h2&gt;
+
+&lt;p&gt;We have seen how a modest set of rules can create an elegant way to reason about the complex behavior of programs. Rust already has a very interesting form of static analysis, but it is decidable and much simpler, as a result, there is a lot of things it can not reason about, like raw pointers. We need a more advanced model (like the one we proposed in this post) to reason about such things.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

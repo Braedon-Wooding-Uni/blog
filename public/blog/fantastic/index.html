@@ -1,0 +1,526 @@
+
+<!DOCTYPE html>
+<html lang="en-us">
+
+    <head>
+
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+        <meta property="og:title" content=" Why Rust&#39;s `std::collections` is absolutely fantastic &middot;  Ticki&#39;s blog" />
+        <meta property="og:site_name" content="Ticki&#39;s blog" />
+        <meta property="og:url" content="http://ticki.github.io/blog/fantastic/" />
+
+    
+        <meta property="og:type" content="article" />
+        <meta property="og:article:published_time" content="2016-09-14T16:07:34&#43;02:00" />
+        <meta property="og:article:tag" content="rust" />
+        <meta property="og:article:tag" content="data-structures" />
+        <meta property="og:article:tag" content="standard-library" />
+        <meta property="og:article:tag" content="follow-up" />
+        
+
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:site" content="@ticki_" />
+        <meta name="twitter:creator" content="@ticki_" />
+        <meta name="twitter:title" content="Why Rust&#39;s `std::collections` is absolutely fantastic" />
+        <meta name="twitter:description" content="Now that we&#39;ve seen the bad stuff of `std::collections`, we&#39;re going to look into all the good stuff and various techniques used to optimize and improve the collections" />
+        <meta name="twitter:url" content="http://ticki.github.io/blog/fantastic/" />
+    
+
+        <title> Why Rust&#39;s `std::collections` is absolutely fantastic &middot;  Ticki&#39;s blog</title>
+
+    
+        <meta name="description" content="Now that we&#39;ve seen the bad stuff of `std::collections`, we&#39;re going to look into all the good stuff and various techniques used to optimize and improve the collections" />
+    
+
+        <meta name="p:domain_verify" content="fc173d84e3a4de948ed4bda2908afd3e"/>
+        <meta name="HandheldFriendly" content="True" />
+        <meta name="MobileOptimized" content="320" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        
+        
+
+    
+        <link href="http://ticki.github.io/index.xml" rel="alternate" type="application/rss+xml" title="Ticki&#39;s blog" />
+    
+
+    
+        <link rel="canonical" href="http://ticki.github.io/blog/fantastic/" />
+
+    
+    <script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "Article",
+        "headline": "Why Rust\x27s `std::collections` is absolutely fantastic",
+        "author": {
+            "@type": "Person",
+            "name": "http://profiles.google.com/?rel=author"
+        },
+        "datePublished": "2016-09-14",
+        "description": "Now that we\x27ve seen the bad stuff of `std::collections`, we\x27re going to look into all the good stuff and various techniques used to optimize and improve the collections",
+        "wordCount":  1886 
+    }
+
+    </script>
+
+    <script type="text/javascript">
+    
+    
+      var disqus_shortname = 'http-ticki-github-io';
+      var disqus_identifier = 'http:\/\/ticki.github.io\/blog\/fantastic\/';
+      var disqus_title = 'Why Rust\x27s `std::collections` is absolutely fantastic';
+      var disqus_url = 'http:\/\/ticki.github.io\/blog\/fantastic\/';
+    
+
+    </script>
+    
+
+    <style>
+@charset "UTF-8";article,header,img,main,nav,section{display:block}blockquote,p,pre,ul{margin:2em auto}#wrapper,pre{width:100%;box-sizing:border-box}#nav,#wrapper,code{position:relative}#nav,body{background:#fff}#menu,blockquote,pre code{background:0 0}#menu,#menu .menu-header,#menu .menu-list,#wrapper,.post-nav .post-nav-item .post-nav-teaser .post-nav-info,blockquote,pre{box-sizing:border-box}img{border:0;max-width:100%;height:auto;margin:2.5em auto}html{font-family:sans-serif;-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%}code,pre{font-family:monospace,monospace;font-size:1em}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:300;src:local("Merriweather Sans Light"),local("MerriweatherSans-Light"),url(//fonts.gstatic.com/s/merriweathersans/v5/6LmGj5dOJopQKEkt88GowY_zIojJi0m4a5Z6tRh6itY.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:400;src:local("Merriweather Sans Regular"),local("MerriweatherSans-Regular"),url(//fonts.gstatic.com/s/merriweathersans/v5/AKu1CjQ4qnV8MUltkAX3sL2aU247V0zTzydO4RoO9Ok.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:700;src:local("Merriweather Sans Bold"),local("MerriweatherSans-Bold"),url(//fonts.gstatic.com/s/merriweathersans/v5/6LmGj5dOJopQKEkt88GowQfd-b-I5PxxcmB4_-MNcqw.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:800;src:local("Merriweather Sans ExtraBold"),local("MerriweatherSans-ExtraBold"),url(//fonts.gstatic.com/s/merriweathersans/v5/6LmGj5dOJopQKEkt88GowWT7sFQ1Iz1BbpcuCPlgc9Q.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:italic;font-weight:300;src:local("Merriweather Sans Light Italic"),local("MerriweatherSans-LightItalic"),url(//fonts.gstatic.com/s/merriweathersans/v5/nAqt4hiqwq3tzCecpgPmVX9UU5BmOJGkLxUCVv5VXdc.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:italic;font-weight:400;src:local("Merriweather Sans Italic"),local("MerriweatherSans-Italic"),url(//fonts.gstatic.com/s/merriweathersans/v5/3Mz4hOHzs2npRMG3B1ascf0KIgDhPIHb_R-SWdtqte8.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:italic;font-weight:700;src:local("Merriweather Sans Bold Italic"),local("MerriweatherSans-BoldItalic"),url(//fonts.gstatic.com/s/merriweathersans/v5/nAqt4hiqwq3tzCecpgPmVYM8pfYvjMoOxygpzLVILAs.woff) format("woff")}@font-face{font-family:Inconsolata;font-style:normal;font-weight:400;src:local("Inconsolata"),url(//fonts.gstatic.com/s/inconsolata/v12/BjAYBlHtW3CJxDcjzrnZCIbN6UDyHWBl620a-IRfuBk.woff) format("woff")}@font-face{font-family:Inconsolata;font-style:normal;font-weight:700;src:local("Inconsolata Bold"),local("Inconsolata-Bold"),url(//fonts.gstatic.com/s/inconsolata/v12/AIed271kqQlcIRSOnQH0yTqR_3kx9_hJXbbyU8S6IN0.woff) format("woff")}@font-face{font-family:icons;src:url(/fonts/icons.eot?9273991);src:url(/fonts/icons.eot?9273991#iefix) format("embedded-opentype"),url(/fonts/icons.woff?9273991) format("woff"),url(/fonts/icons.ttf?9273991) format("truetype"),url(/fonts/icons.svg?9273991#icons) format("svg");font-weight:400;font-style:normal}[class^=icon-]:before{font-family:icons;font-style:normal;font-weight:400;speak:none;display:inline-block;text-decoration:inherit;width:1em;margin-right:.2em;text-align:center;font-variant:normal;text-transform:none;line-height:1em;margin-left:.2em;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}.icon-arrow-left:before{content:'\e804'}.icon-arrow-right:before{content:'\e807'}.icon-rss:before{content:'\e808'}.icon-menu:before{content:'\e809'}body{margin:0;font:300 1em/1.5em 'Merriweather Sans',sans-serif;color:#595B66}blockquote,i{font-style:italic}code,pre{font-family:Inconsolata,monospace}a,blockquote,code,i{font-weight:400}::-moz-selection{color:#222;background:#D6EDFF;text-shadow:none}::-moz-selection,::selection{color:#222;background:#D6EDFF;text-shadow:none}a{background-color:transparent;color:inherit;text-decoration:none;transition:all ease-out .2s}.post-content a{border-bottom:2px solid #36D995}h1,h4{text-rendering:optimizeLegibility;color:#1F2026}h1{font-size:2em;line-height:1em;margin:2em 0 -.5em}h4{font-size:1.25em;line-height:1.2em;margin:2.4em 0 -.8em}ul{list-style:none;padding-left:3em}blockquote{padding:0 1em;border-left:.25em solid #D4D5D9;color:#595B66}blockquote *{margin:1em auto}blockquote :first-child{margin-top:0}blockquote :last-child{margin-bottom:0}i{color:#363740}code{display:inline-block;top:-1px;padding:3px 6px;margin:-1px 2px;font-size:.875em;line-height:1.143em;background:#E1E2E6;color:#000;border-radius:2px}pre{padding:1em;white-space:pre;overflow:auto;background:#9D9FA6;color:#fff}pre code{position:static;top:auto;font-size:1em;line-height:1.5em;white-space:-moz-pre-wrap;white-space:pre-wrap;vertical-align:inherit;border:none;padding:0}#menu .menu-header:before,.post .post-title:before{border-bottom:4px solid #36D995;content:''}.inner{max-width:48em;margin:0 auto;padding:0 1em}#wrapper{min-height:100vh;padding-bottom:6em;background:#F2F3F5}#push{-webkit-transform:translate3d(0,0,0);transform:translate3d(0,0,0);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;opacity:1}#nav{z-index:70;transition:all ease-out .4s;-webkit-transform:translate3d(0,0,0);transform:translate3d(0,0,0);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;opacity:1}#nav:after{clear:both;content:'';display:table}#nav .nav-logo{float:left;height:2em;padding:1em;max-width:50%}#nav .nav-logo img{width:auto;max-width:none;height:2em;margin:0}#nav .nav-menu{float:right}#nav .nav-menu:after{clear:both;content:'';display:table}#nav .nav-menu a{display:block;width:1em;height:1em;line-height:1em;padding:1.5em;text-align:center;float:left;cursor:pointer}#nav .nav-menu a i:before{margin:auto}#menu{display:none;position:fixed;left:50%;top:5%;width:30em;height:90%;margin-left:-15em;padding:3em 0 0;overflow:hidden;transition:all ease-out .3s;-webkit-transform:translate3d(0,2em,0);transform:translate3d(0,2em,0);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;opacity:0;z-index:100}@media only screen and (max-width:50em){#menu{width:90%;left:5%;margin-left:auto}}#menu .menu-header{position:absolute;left:0;top:0;width:100%;height:3.5em;padding:1em 1.5em .5em;margin-bottom:1em;line-height:2em;z-index:110;background:#fff}#menu .menu-header:before{position:absolute;left:-5%;bottom:-1em;width:110%;height:2em;background:#fff;box-shadow:0 .125em .125em rgba(0,0,0,.1);-webkit-transform:rotate(2.5deg);transform:rotate(2.5deg);transition:all ease-out .2s;z-index:115}#menu .menu-header:after{clear:both;content:'';display:table}#menu .menu-header .menu-label{position:relative;display:block;float:left;z-index:120}#menu .menu-header .menu-close{position:relative;display:block;float:right;width:2em;height:2em;padding:1em;margin:-1em -1.5em -1em 0;cursor:pointer;z-index:125}#menu .menu-header .menu-close:after,#menu .menu-header .menu-close:before{content:'';position:absolute;left:50%;top:50%;background:#9D9FA6;-webkit-transform:rotate(45deg);transform:rotate(45deg)}.overlay,.overlay:before{top:0;width:100%;height:100%}#menu .menu-header .menu-close:after{width:2px;height:1em;margin:-.5em 0 0 -1px}#menu .menu-header .menu-close:before{width:1em;height:2px;margin:-1px 0 0 -.5em}#menu .menu-list{position:relative;list-style:none;margin:0;padding:2em 0;height:100%;overflow-x:hidden;overflow-y:scroll;background:#fff}.overlay{position:fixed;left:0;z-index:80;display:none}.overlay:before{content:'';position:absolute;left:0;background:#1F2026;opacity:0;transition:all ease-out .3s;-webkit-transform-style:preserve-3d;transform-style:preserve-3d}.post{position:relative;z-index:20}.post .post-meta{display:block;font-size:.75em;line-height:1.334em;font-weight:400;margin-bottom:1.334em}.post .post-title{position:relative;color:#000;font-size:2em;line-height:1.375em;font-weight:800;text-indent:-1px;margin:.25em 0 .75em}.post .post-title:before{position:absolute;left:0;bottom:-.334em;width:1em;margin-bottom:-2px}.post .post-header{padding:4em 0 0;margin-bottom:3em}.post-footer .post-share a span{display:none}.post-nav .post-nav-item{position:fixed;top:50%;display:block;margin-top:-4em;overflow:hidden;border-radius:10em;transition:none}@media only screen and (max-width:70em){.post-nav .post-nav-item{position:absolute;top:auto;margin:auto;max-width:50%}}.post-nav .post-nav-item.post-nav-next{left:0;text-align:left}.post-nav .post-nav-item.post-nav-next .post-nav-icon{float:left}.post-nav .post-nav-item.post-nav-next .post-nav-icon i{left:-.05em}.post-nav .post-nav-item.post-nav-next .post-nav-info{padding-left:6em}.post-nav .post-nav-item.post-nav-prev{right:0;text-align:right}.post-nav .post-nav-item.post-nav-prev .post-nav-icon{float:right}.post-nav .post-nav-item.post-nav-prev .post-nav-icon i{right:-.05em}.post-nav .post-nav-item.post-nav-prev .post-nav-info{padding-right:6em}.post-nav .post-nav-item .post-nav-teaser{display:block;padding:1em;transition:all ease-out .2s;max-width:25em;overflow:visible}.post-nav .post-nav-item .post-nav-teaser:after{clear:both;content:'';display:table}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon{display:block;width:5em;height:5em;line-height:5em;text-align:center;box-sizing:border-box;border-radius:10em;border:1px solid #36D995;box-shadow:0 0 0 0 transparent;transition:all ease-out .1s;background:#F2F3F5}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon i{position:relative;font-size:2em}@media only screen and (max-width:30em){.post-nav .post-nav-item .post-nav-teaser .post-nav-icon{width:4em;height:4em;line-height:4em}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon i{font-size:1.5em}}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon i:before{margin:auto}.post-nav .post-nav-item .post-nav-teaser .post-nav-info{display:none;width:100%;transition:all ease-out .2s}.post-nav .post-nav-item .post-nav-teaser .post-nav-info .post-nav-title{display:block;max-height:1.25em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:1.25em 0 .25em;font-size:1em;line-height:1.25em;font-weight:700;color:#363740}.post-nav .post-nav-item .post-nav-teaser .post-nav-info .post-nav-excerpt{display:block;max-height:1.334em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0;font-size:.75em;line-height:1.334em;font-weight:400;color:#9D9FA6}
+</style>
+
+
+    </head>
+    <body class="home-template" style="display: none;">
+      <section id="wrapper">
+        <div id="ajax-container">
+          <nav id="nav" class="nav">
+            <div class="nav-logo">
+              <a href="http://ticki.github.io/">
+      			  	
+      			  	
+      			  	<img src="/logo.png" alt="Logo"/>
+      			  	
+              </a>
+			  	    
+            </div>
+            <div class="nav-menu">
+              <a class="rss" href="">
+                <i class="icon-rss"></i>
+              </a>
+                
+                <a class="menu" data-action="toc" data-target="toc"><i class="icon-location"></i></a>
+                
+                
+                <a class="menu" data-action="menu" data-target="menu"><i class="icon-menu"></i></a>
+                
+            </div>
+          </nav>
+
+
+<main class="content" role="main">
+	<article class="post">
+		<div class="inner">
+
+			<div id="push">
+
+  			<header class="post-header">
+  				<span class="post-meta">
+						<span class="post-date">14 Sep 2016</span> <span class="reading-time">| <span class="estimated-reading-time">9 min.</span> (<span class="word-count">1886</span> words)</span></span>
+  				</span>
+  				<div class="clear"></div>
+  				<h1 class="post-title">Why Rust&#39;s `std::collections` is absolutely fantastic</h1>
+  			</header>
+
+  			<section class="post-content">
+  				
+
+<p>My <a href="http://ticki.github.io/blog/horrible/">last blog post</a> was about all the short-fallings and problems <code>std::collections</code> has. This post will be about the opposite: all the good things about <code>std::collections</code> and what other languages can learn from Rust.</p>
+
+<p>This post is a part of an on-going series of posts criticizing and praising various parts of Rust.</p>
+
+<h1 id="the-philosophy-of-std-collections">The philosophy of <code>std::collections</code></h1>
+
+<p>Rust has an intentionally small set of collections. This has both advantages and disadvantages.</p>
+
+<p>For one, the surface area becomes smaller, which allows libstd to focus on the support and performance of a few really good collections.</p>
+
+<p>Another advantage is the fact that the user can easier choose which collection. If you take Java&rsquo;s standard library, which is arguably bloated, the programmer is often confused about which data structure to use. Rust&rsquo;s small sets of primitives is easier to work with.</p>
+
+<p>If a specialized data structure really is needed, <a href="https://crates.io">crates.io</a> contains many cool implementations of various data structures, including some <em>really</em> specialized ones. That just proves that the Rust ecosystem is healthy.</p>
+
+<h1 id="when-is-a-primitive-appropriate-for-the-standard-library">When is a primitive appropriate for the standard library?</h1>
+
+<p>There are generally two factors to consider:</p>
+
+<ol>
+<li><p>Standardization: The standard library serves for consituting some uniformity between libraries. This includes (but is not limited to) API interoperability, familiar API.</p></li>
+
+<li><p>Convenience: Many primitives in the standard library are there simply for the sake of convenience.</p></li>
+</ol>
+
+<p>Rust&rsquo;s standard library is the smallest set of primitives which are sufficient per the factors above. The collection module is no different: The smallest viable set of collections for standardization and convenience is provided.</p>
+
+<p>I think the <code>std::collections</code> accomplishes that pretty well. It contains a few, frequently used structures, such as hash tables, B-trees, and vectors.</p>
+
+<h1 id="vec-t"><code>Vec&lt;T&gt;</code></h1>
+
+<p><img src="https://i.imgur.com/UDeQOFK.png" alt="Vector growth" /></p>
+
+<p>Most programmers are familiar with vectors, the growable contiguous array with random-access property. Indeed, it is a very simple and well-defined structure. It is not a particularly elegant structure, but it is practical, simple, and fast.</p>
+
+<p>The only thing that is really implementation defined is the reallocation strategy. Vectors tries to avoid excessive allocations by allocating some extra capacity, making pop/push amortized O(1). I think the choice of strategy is a sane one. It&rsquo;s relatively simple: The initial allocation is some constant number of elements, when the capacity is reached, multiply it by two.</p>
+
+<p>The API is very similar to C++&rsquo;s <code>std::vector</code>. Rust has no overloaded syntax with respect to initializing it, however it provides macro <code>vec!</code>, which allows for doing exactly that.</p>
+
+<p><code>Vec::new()</code> does not do an initial allocation, this is based off the observation that many vectors are empty throughout their life. This mean that we can (without calling <code>malloc</code>) initialize an empty vector with capacity zero. This will simply set the start point to 0x1 (the reason it isn&rsquo;t null is because Rust has a language-supported optimization, which makes type marked as non-null nullable in certain tagged unions).</p>
+
+<h2 id="side-note-rust-s-allocation-api">Side note: Rust&rsquo;s allocation API</h2>
+
+<p><img src="http://i.imgur.com/cH5a8gu.png" alt="A simple diagram comparing the two" /></p>
+
+<p>One of my favorite aspects of Rust is that it provides a malloc API which has actually been thought about, in contrast to most other APIs (I&rsquo;m looking at you libc <code>malloc</code>).</p>
+
+<p>There are two main differences from <code>malloc</code>:</p>
+
+<ol>
+<li><p>The programmer provides the size. Instead of doing <code>free(pointer)</code>, you do <code>free(pointer, size)</code>. That might seem like a minor change (and maybe even annoying), but the motivation is pretty clear: Due to the limitations of the libc <code>malloc</code> API, most allocators add a the size to the block metadata of the allocation. This ranges from 2-8 bytes¹, but if you think about it, that&rsquo;s quite a lot for small allocations¹. The information is redundant, because the user almost always know the size of the buffer. For example, <code>Vec</code> would only have to provide its capacity, etc.</p></li>
+
+<li><p>You can force inplace allocations (buffer extensions). In the libc API, there is no way to reallocate inplace, if possible. You have to go through <code>realloc</code>, which might call <code>memcpy</code>. Considering that inplace reallocation is a lot faster, there are scenarios where you&rsquo;d like a reallocation, but it is not important enough for you to pay the <code>memcpy</code>. Take <code>Vec</code> for example, if it is &ldquo;almost at capacity&rdquo;, you&rsquo;d like an extension, because waiting until it is filled up might mean that said memory is already taken. On the other hand, doing an early reallocation is bad style, since it provides no real benefit over doing it when the capacity is full.</p></li>
+</ol>
+
+<p>It is more complex than libc&rsquo;s <code>malloc</code> API, but Rust programmers rarely use these symbols directly. Rather, it is abstracted away under safe primitives. The implementations of such primitives might exploit it for performance.</p>
+
+<p>Now, this is only an API, and Rust currently uses Jemalloc, so not all of these features are supported. I&rsquo;ll take the liberty to shamelessly plug <a href="https://github.com/redox-os/ralloc">ralloc</a>, a pure Rust memory allocator making full use of the Rust allocation API.</p>
+
+<p>¹ Note that various optimizations (such as seperated segments and specialized bookkeeping for small blocks) can be done (especially for small allocations), but you ultimatively cannot remove the cost without changing the API.</p>
+
+<h1 id="hashmap"><code>HashMap</code></h1>
+
+<h2 id="collision-resolution">Collision resolution</h2>
+
+<p><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Hash_table_5_0_1_1_1_1_0_SP.svg/380px-Hash_table_5_0_1_1_1_1_0_SP.svg.png" alt="Open addressing" /></p>
+
+<p>In <a href="http://ticki.github.io/blog/horrible/">the last post</a>, I strongly criticized the hash table implementation, but after extensive discussion on Reddit and IRC, I changed my mind. The only thing I really disagree with for <code>HashMap</code> is the choice of Sip-hasher.</p>
+
+<p>My analysis of the implementations had one big flaw: not differentiating between linear Robin Hood hashing and double Robin Hood hashing. Rust is using the former. My claim that it had a lot of cache misses was completely wrong: It actually have excellent cache behavior.</p>
+
+<p>Due to the terrible naming, it can be very confusing (even <a href="https://en.wikipedia.org/wiki/Hash_table#Robin_Hood_hashing">it&rsquo;s Wikipedia page</a> is wrong), but there are two variants: The classical, double-hashing variant (which was described in Pedro&rsquo;s original paper), and the modern linear probing variant. I wrongly said that Rust is using the former, but there are good news: It doesn&rsquo;t!</p>
+
+<p>What Robin Hood does is minimizing the probe lengths by giving up the slot if the probe length is longer. In other words, the worst-case is improved and it is more equally distributed making clustering less damaging.</p>
+
+<p>Let&rsquo;s consider a table like this:</p>
+
+<pre><code>    [0|neat|feet]
+    [1|good|hood]
+    [0|load|boat]
+    [ |    |    ]
+    ...
+</code></pre>
+
+<p>Then let&rsquo;s say we want to insert <code>fool</code> at <code>cool</code>. Let&rsquo;s say that <code>hash(&quot;cool&quot;) == 1</code>:</p>
+
+<pre><code>    [0|neat|feet]
+   *[1|good|hood]
+    [0|load|boat]
+    [ |    |    ]
+    ...
+</code></pre>
+
+<p>As you can see the entry marked with <code>*</code> is already taken, so we need to probe forward, but that&rsquo;s taken too. Well, right now we have probed one time, so our probe length is one, compared to the probe length of the <code>load</code> slot, which is zero. To minimize our probe length, we replace <code>load</code> with <code>cool</code>:</p>
+
+<pre><code>    [0|neat|feet]
+    [1|good|hood]
+    [1|cool|fool]
+    [ |    |    ]
+    ...
+</code></pre>
+
+<p>We still need to find a place for our old entry:</p>
+
+<pre><code>    [0|load|boat]
+</code></pre>
+
+<p>Luckily, the next slot is empty, so we get:</p>
+
+<pre><code>    [0|neat|feet]
+    [1|good|hood]
+    [1|cool|fool]
+    [1|load|boat]
+    ...
+</code></pre>
+
+<p>If we had simply done linear probing, we&rsquo;d have:</p>
+
+<pre><code>    [0|neat|feet]
+    [1|good|hood]
+    [0|load|boat]
+    [2|cool|fool]
+    ...
+</code></pre>
+
+<p>Then looking up <code>cool</code> would need two jumps, i.e. a bad worst case.</p>
+
+<p>In other words, you save the slowness of rehashing/cache missing, and yet preserve the cool features of Robin Hood hashing.</p>
+
+<p>I think it&rsquo;s a good choice.</p>
+
+<h2 id="siphasher"><code>SipHasher</code></h2>
+
+<p>I&rsquo;m still very strongly opposed to having <code>SipHasher</code> as default hash function, but it is not entirely without advantages. Security is one.</p>
+
+<p>What I really want to talk about is a sane compromise between <code>SipHasher</code> and a fast hashing functions which ensures the same security/DoS-resistance properties of <code>SipHasher</code>, while having better performance in most cases. This is not yet implemented, but it has been floating around in the community for a while now, and it is definitely a plausible alternative, which we will likely see in Rust in the future.</p>
+
+<p>The proposal is called <em>adaptive hashing</em>, and it is in fact a relatively simple strategy: Use a fast hash function initially, and when a probe length in the table surpasses some threshold, switch to <code>SipHasher</code>.</p>
+
+<p>A long probe sequence is relatively rare to occur naturally, so it is a good indicator for exploitation.</p>
+
+<p>A more complicated version of the proposal is to make it slot-specific, in such a way that the switch only happens when a specific probe length exceeds some threshold.</p>
+
+<p>An initial implementation (outside the standard library) along with benchmarks can be found <a href="https://github.com/contain-rs/hashmap2/pull/5">here</a>.</p>
+
+<h1 id="b-trees">B-trees</h1>
+
+<p><img src="https://i.imgur.com/tUmeDcr.png" alt="An example B-tree." /></p>
+
+<p>B-trees are one of those structures that people always implement wrongly in one way or another. Fortunately, Rust&rsquo;s standard library gets this one right.</p>
+
+<p>The code is clear and the performance is good. The only catch is the cache efficiency, which there are still room for improvement of.</p>
+
+<h1 id="binary-heap">Binary heap</h1>
+
+<p><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Heap_delete_step0.svg/500px-Heap_delete_step0.svg.png" alt="A binary tree satisfying the heap property." /></p>
+
+<p><code>std::collections::BinaryHeap</code> is a fairly standard implementations of a flat-array binary heap. Only one thing here really stand out: the <code>Hole</code> struct.</p>
+
+<p>The definition looks like this:</p>
+
+<pre><code class="language-rust">struct Hole&lt;'a, T: 'a&gt; {
+    data: &amp;'a mut [T],
+    /// `elt` is always `Some` from new until drop.
+    elt: Option&lt;T&gt;,
+    pos: usize,
+}
+</code></pre>
+
+<p>It represents some segment from the heap array which is invalid (i.e. shouldn&rsquo;t be read). This is enforced through the static checking of rustc, which verifies that mutable references are mutually exclusive.</p>
+
+<p>I like this approach over the more standard ones, due to eliminating many bugs you easily encounter while writing a flat binary heap.</p>
+
+<h1 id="code-quality">Code quality</h1>
+
+<p>The code quality of <code>std::collections</code>, or <code>std</code> is general, is very good. It contains a lot of comments explaining optimizations implementation strategies and other things important for understanding the code:</p>
+
+<table>
+<thead>
+<tr>
+<th align="right">Files</th>
+<th align="right">Total</th>
+<th align="right">Blanks</th>
+<th align="right">Comments</th>
+<th align="right">Code</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td align="right">18</td>
+<td align="right">18868</td>
+<td align="right">1530</td>
+<td align="right">8567</td>
+<td align="right">8771</td>
+</tr>
+</tbody>
+</table>
+
+<p>Here&rsquo;s an example:</p>
+
+<pre><code>// &gt; Why a load factor of approximately 90%?
+//
+// In general, all the distances to initial buckets will converge on the mean.
+// At a load factor of α, the odds of finding the target bucket after k
+// probes is approximately 1-α^k. If we set this equal to 50% (since we converge
+// on the mean) and set k=8 (64-byte cache line / 8-byte hash), α=0.92. I round
+// this down to make the math easier on the CPU and avoid its FPU.
+// Since on average we start the probing in the middle of a cache line, this
+// strategy pulls in two cache lines of hashes on every lookup. I think that's
+// pretty good, but if you want to trade off some space, it could go down to one
+// cache line on average with an α of 0.84.
+//
+// &gt; Wait, what? Where did you get 1-α^k from?
+//
+// On the first probe, your odds of a collision with an existing element is α.
+// The odds of doing this twice in a row is approximately α^2. For three times,
+// α^3, etc. Therefore, the odds of colliding k times is α^k. The odds of NOT
+// colliding after k tries is 1-α^k.
+//
+// [...]
+</code></pre>
+
+<p>Such comments can be found in many places and provides great insight into the small tricks used for speeding things up.</p>
+
+<h1 id="conclusion">Conclusion</h1>
+
+<p>We&rsquo;ve seen a few insights and techniques used, as well as the reasoning behind it and ways to improve it. It&rsquo;s not horrible (or even bad) as a whole. It has its rough edges (some of which were pointed out in the last post), but it&rsquo;s in constant improvement and has many great primitives.</p>
+
+<p>I&rsquo;d like to thank all the people who&rsquo;ve implemented these collections, as well as the on going out-of-tree implementations of collections.</p>
+
+  			</section>
+
+  			<footer class="post-footer">
+  				<div class="post-tags">
+            
+            
+                <a href="http://ticki.github.io//tags/rust/">rust</a>
+            
+                <a href="http://ticki.github.io//tags/data-structures/">data-structures</a>
+            
+                <a href="http://ticki.github.io//tags/standard-library/">standard-library</a>
+            
+                <a href="http://ticki.github.io//tags/follow-up/">follow-up</a>
+            
+            
+  				</div>
+  				<div class="post-share">
+  					<a class="icon-twitter" href="https://twitter.com/share?text=Why%20Rust%27s%20%60std%3a%3acollections%60%20is%20absolutely%20fantastic&url=http%3a%2f%2fticki.github.io%2fblog%2ffantastic%2f" onclick="window.open(this.href, 'twitter-share', 'width=550,height=235');return false;">
+  						<span>Twitter</span>
+  					</a>
+  					<a class="icon-facebook" href="https://www.facebook.com/sharer/sharer.php?u=http%3a%2f%2fticki.github.io%2fblog%2ffantastic%2f" onclick="window.open(this.href, 'facebook-share','width=580,height=296');return false;">
+  						<span>Facebook</span>
+  					</a>
+  					<a class="icon-gplus" href="https://plus.google.com/share?url=http%3a%2f%2fticki.github.io%2fblog%2ffantastic%2f" onclick="window.open(this.href, 'google-plus-share', 'width=490,height=530');return false;">
+  						<span>Google+</span>
+  					</a>
+  				</div>
+  			</footer>
+
+  			<aside class="post-comments">
+    
+    
+    <div id="disqus_thread"></div>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+    
+</aside>
+
+
+			</div>
+
+			<nav class="post-nav">
+				
+					<a class="post-nav-item post-nav-next" href="http://ticki.github.io/blog/skip-lists-done-right/">
+						<section class="post-nav-teaser">
+							<span class="post-nav-icon"><i class="icon-arrow-left"></i></span>
+							<span class="post-nav-info">
+								<h4 class="post-nav-title">Skip Lists: Done Right</h4>
+								<p class="post-nav-excerpt">    Skip lists are a wonderful data structure, but it is hard to get\
+    right. This blog post presents various techniques to optimize and\
+    improve the implementation of skip lists.
+&hellip;</p>
+							</span>
+						</section>
+					</a>
+				
+				
+					<a class="post-nav-item post-nav-prev" href="http://ticki.github.io/blog/horrible/">
+						<section class="post-nav-teaser">
+							<span class="post-nav-icon"><i class="icon-arrow-right"></i></span>
+							<span class="post-nav-info">
+								<h4 class="post-nav-title">A Critique of Rust&#39;s `std::collections`</h4>
+								<p class="post-nav-excerpt">This is an in-depth critique of the bad parts of Rust&#39;s collection primitves.&hellip;</p>
+							</span>
+						</section>
+					</a>
+				
+				<div class="clear"></div>
+			</nav>
+
+		</div>
+	</article>
+</main>
+
+				<div id="body-class" style="display: none;"></div>
+				<footer id="footer">
+					<section class="credits">
+						<span class="credits-theme">Theme <a href="https://github.com/zenithar/hugo-theme-bleak" target="_blank" rel="nofollow">Bleak</a> by <a href="http://zutrinken.com" target="_blank" rel="nofollow">zutrinken</a></span>
+						<span class="credits-software">Published with <a href="http://gohugo.io" target="_blank" rel="nofollow">Hugo</a></span>
+					</section>
+				</footer>
+				
+<div id="menu" data-target="menu">
+    <div class="menu-header">
+        <span class="menu-label">Menu</span>
+        <a class="menu-close" data-action="menu" data-target="menu"></a>
+    </div>
+
+    <div class="menu-list">
+        
+        
+        <li class="menu-list-item">
+            
+            <a class="home current js-ajax-link" href="/about/">About</a>
+        </li>
+        
+        
+        <li class="menu-list-item">
+            
+            <a class="home current js-ajax-link" href="https://github.com/ticki">GitHub</a>
+        </li>
+        
+    </div>
+
+</div>
+
+				
+<div id="tocMenu" data-target="toc">
+    <div class="menu-header">
+        <span class="menu-label">Menu</span>
+        <a class="menu-close" data-action="toc" data-target="toc"></a>
+    </div>
+    <div id="toc" class="menu-list">
+        <nav id="TableOfContents">
+<ul>
+<li><a href="#the-philosophy-of-std-collections">The philosophy of <code>std::collections</code></a></li>
+<li><a href="#when-is-a-primitive-appropriate-for-the-standard-library">When is a primitive appropriate for the standard library?</a></li>
+<li><a href="#vec-t"><code>Vec&lt;T&gt;</code></a>
+<ul>
+<li><a href="#side-note-rust-s-allocation-api">Side note: Rust&rsquo;s allocation API</a></li>
+</ul></li>
+<li><a href="#hashmap"><code>HashMap</code></a>
+<ul>
+<li><a href="#collision-resolution">Collision resolution</a></li>
+<li><a href="#siphasher"><code>SipHasher</code></a></li>
+</ul></li>
+<li><a href="#b-trees">B-trees</a></li>
+<li><a href="#binary-heap">Binary heap</a></li>
+<li><a href="#code-quality">Code quality</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+</nav>
+    </div>
+</div>
+
+
+				<div class="overlay"></div>
+			</div>
+		</section>
+
+    <script>
+      (function(c,f){asyncLoader=function(i,h){i.foreach(function(k,j){e(j,d(j),h)});if(typeof h.callback=="function"){var g=setInterval(function(){if(f.readyState==="complete"){clearInterval(g);h.callback()}},10)}};var d=function(g){var h=g.split(".");return h[h.length-1]},e=function(h,i,g){switch(i){case"js":a(h,g);break;case"css":b(h);break;default:break}},a=function(i,h){var g=document.createElement("script");g.type="text/javascript";g.async=true;g.src=i;document.getElementsByTagName("head")[0].appendChild(g)},b=function(g){var h=document.createElement("link");h.type="text/css";h.rel="stylesheet";h.href=g;document.getElementsByTagName("head")[0].appendChild(h)};Array.prototype.foreach=function(h){for(var g=0;g<this.length;g++){h(g,this[g])}}})(this,document);
+
+      asyncLoader([
+				"/js/dependencies.js",
+				"/css/dependencies.css"
+      ],{
+        callback:function(){
+					asyncLoader([
+						"/css/style.css",
+						"/js/script.js"
+					], {
+						callback: function() {
+							$('body').fadeIn( 800 );
+						}
+					});
+        }
+      });
+
+</script>
+
+
+
+</body>
+</html>
+

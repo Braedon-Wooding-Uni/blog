@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Lz4 on Ticki&#39;s blog</title>
+    <link>http://ticki.github.io/tags/lz4/</link>
+    <description>Recent content in Lz4 on Ticki&#39;s blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Tue, 25 Oct 2016 23:25:15 +0200</lastBuildDate>
+    <atom:link href="http://ticki.github.io/tags/lz4/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>How LZ4 works</title>
+      <link>http://ticki.github.io/blog/how-lz4-works/</link>
+      <pubDate>Tue, 25 Oct 2016 23:25:15 +0200</pubDate>
+      
+      <guid>http://ticki.github.io/blog/how-lz4-works/</guid>
+      <description>&lt;script type=&#34;text/javascript&#34;
+  src=&#34;https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&#34;&gt;
+&lt;/script&gt;
+
+&lt;p&gt;LZ4 is a really fast compression algorithm with a reasonable compression ratio, but unfortunately there is limited documentation on how it works. The only explanation (not spec, explanation) &lt;a href=&#34;https://fastcompression.blogspot.com/2011/05/lz4-explained.html&#34;&gt;can be found&lt;/a&gt; on the author&#39;s blog, but I think it is less of an explanation and more of an informal specification.&lt;/p&gt;
+
+&lt;p&gt;This blog post tries to explain it such that anybody (even new beginners) can understand and implement it.&lt;/p&gt;
+
+&lt;h1 id=&#34;linear-smallinteger-code-lsic&#34;&gt;Linear small-integer code (LSIC)&lt;/h1&gt;
+
+&lt;p&gt;The first part of LZ4 we need to explain is a smart but simple integer encoder. It is very space efficient for 0-255, and then grows linearly, based on the assumption that the integers used with this encoding rarely exceeds this limit, as such it is only used for small integers in the standard.&lt;/p&gt;
+
+&lt;p&gt;It is a form of addition code, in which we read a byte. If this byte is the maximal value (255), another byte is read and added to the sum. This process is repeated until a byte below 255 is reached, which will be added to the sum, and the sequence will then end.&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/lz4_int_encoding_flowchart.svg&#34; alt=&#34;We try to fit it into the next cluster.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;In short, we just keep adding bytes and stop when we hit a non-0xFF byte.&lt;/p&gt;
+
+&lt;p&gt;We&#39;ll use the name &amp;quot;LSIC&amp;quot; for convinience.&lt;/p&gt;
+
+&lt;h1 id=&#34;block&#34;&gt;Block&lt;/h1&gt;
+
+&lt;p&gt;An LZ4 stream is divided into segments called &amp;quot;blocks&amp;quot;. Blocks contains a literal which is to be copied directly to the output stream, and then a back reference, which tells us to copy some number of bytes from the already decompressed stream.&lt;/p&gt;
+
+&lt;p&gt;This is really were the compression is going on. Copying from the old stream allows deduplication and runs-length encoding.&lt;/p&gt;
+
+&lt;h2 id=&#34;overview&#34;&gt;Overview&lt;/h2&gt;
+
+&lt;p&gt;A block looks like:&lt;/p&gt;
+
+&lt;p&gt;&lt;span  class=&#34;math&#34;&gt;\[\overbrace{\underbrace{t_1}_\text{4 bits}\  \underbrace{t_2}_\text{4 bits}}^\text{Token} \quad \underbrace{\overbrace{e_1}^\texttt{LISC}}_\text{If $t_1 = 15$} \quad \underbrace{\overbrace{L}^\text{Literal}}_{t_1 + e\text{ bytes }} \quad \overbrace{\underbrace{O}_\text{2 bytes}}^\text{Little endian} \quad \underbrace{\overbrace{e_2}^\texttt{LISC}}_\text{If $t_2 = 15$}\]&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;And decodes to the &lt;span  class=&#34;math&#34;&gt;\(L\)&lt;/span&gt; segment, followed by a &lt;span  class=&#34;math&#34;&gt;\(t_2 + e_2 + 4\)&lt;/span&gt; bytes sequence copied from position &lt;span  class=&#34;math&#34;&gt;\(l - O\)&lt;/span&gt; from the output buffer (where &lt;span  class=&#34;math&#34;&gt;\(l\)&lt;/span&gt; is the length of the output buffer).&lt;/p&gt;
+
+&lt;p&gt;We will explain all of these in the next sections.&lt;/p&gt;
+
+&lt;h2 id=&#34;token&#34;&gt;Token&lt;/h2&gt;
+
+&lt;p&gt;Any block starts with a 1 byte token, which is divided into two 4-bit fields.&lt;/p&gt;
+
+&lt;h2 id=&#34;literals&#34;&gt;Literals&lt;/h2&gt;
+
+&lt;p&gt;The first (highest) field in the token is used to define the literal. This obviously takes a value 0-15.&lt;/p&gt;
+
+&lt;p&gt;Since we might want to encode higher integer, as such we make use of LSIC encoding: If the field is 15 (the meximal value), we read an integer with LSIC and add it to the original value (15) to obtain the literals length.&lt;/p&gt;
+
+&lt;p&gt;Call the final value &lt;span  class=&#34;math&#34;&gt;\(L\)&lt;/span&gt;.&lt;/p&gt;
+
+&lt;p&gt;Then we forward the next &lt;span  class=&#34;math&#34;&gt;\(L\)&lt;/span&gt; bytes from the input stream to the output stream.&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/lz4_literals_copy_diagram.svg&#34; alt=&#34;We copy from the buffer directly.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;deduplication&#34;&gt;Deduplication&lt;/h2&gt;
+
+&lt;p&gt;The next few bytes are used to define some segment in the already decoded buffer, which is going to be appended to the output buffer.&lt;/p&gt;
+
+&lt;p&gt;This allows us to transmit a position and a length to read from in the already decoded buffer instead of transmitting the literals themself.&lt;/p&gt;
+
+&lt;p&gt;To start with, we read a 16-bit little endian integer. This defines the so called offset, &lt;span  class=&#34;math&#34;&gt;\(O\)&lt;/span&gt;. It is important to understand that the offset is not the starting position of the copied buffer. This starting point is calculated by &lt;span  class=&#34;math&#34;&gt;\(l - O\)&lt;/span&gt; with &lt;span  class=&#34;math&#34;&gt;\(l\)&lt;/span&gt; being the number of bytes already decoded.&lt;/p&gt;
+
+&lt;p&gt;Secondly, similarly to the literals length, if &lt;span  class=&#34;math&#34;&gt;\(t_2\)&lt;/span&gt; is 15 (the maximal value), we use LSIC to &amp;quot;extend&amp;quot; this value and we add the result. This plus 4 yields the number of bytes we will copy from the output buffer. The reason we add 4 is because copying less than 4 bytes would result in a negative expansion of the compressed buffer.&lt;/p&gt;
+
+&lt;p&gt;Now that we know the start position and the length, we can append the segment to the buffer itself:&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/lz4_deduplicating_diagram.svg&#34; alt=&#34;Copying in action.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;It is important to understand that the end of the segment might not be initializied before the rest of the segment is appended, because overlaps are allowed. This allows a neat trick, namely &amp;quot;runs-length encoding&amp;quot;, where you repeat some sequence a given number of times:&lt;/p&gt;
+
+&lt;p&gt;&lt;figure&gt;&lt;img src=&#34;http://ticki.github.io/img/lz4_runs_encoding_diagram.svg&#34; alt=&#34;We repeat the last byte.&#34;&gt;&lt;/figure&gt;&lt;/p&gt;
+
+&lt;p&gt;Note that the duplicate section is not required if you&#39;re in the end of the stream, i.e. if there&#39;s no more compressed bytes to read.&lt;/p&gt;
+
+&lt;h1 id=&#34;compression&#34;&gt;Compression&lt;/h1&gt;
+
+&lt;p&gt;Until now, we have only considered decoding, not the reverse process.&lt;/p&gt;
+
+&lt;p&gt;A dozen of approaches to compression exists. They have the aspects that they need to be able to find duplicates in the already input buffer.&lt;/p&gt;
+
+&lt;p&gt;In general, there are two classes of such compression algorithms:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;HC: High-compression ratio algorithms, these are often very complex, and might include steps like backtracking, removing repeatation, non-greediy.&lt;/li&gt;
+&lt;li&gt;FC: Fast compression, these are simpler and faster, but provides a slightly worse compression ratio.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;We will focus on the FC-class algorithms.&lt;/p&gt;
+
+&lt;p&gt;Binary Search Trees (often B-trees) are often used for searching for duplicates. In particular, every byte iterated over will add a pointer to the rest of the buffer to a B-tree, we call the &amp;quot;duplicate tree&amp;quot;. Now, B-trees allows us to retrieve the largest element smaller than or equal to some key. In lexiographic ordering, this is equivalent to asking the element sharing the largest number of bytes as prefix.&lt;/p&gt;
+
+&lt;p&gt;For example, consider the table:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;abcdddd =&amp;gt; 0
+bcdddd  =&amp;gt; 1
+cdddd   =&amp;gt; 2
+dddd    =&amp;gt; 3
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;If we search for &lt;code&gt;cddda&lt;/code&gt;, we&#39;ll get a partial match, namely &lt;code&gt;cdddd =&amp;gt; 2&lt;/code&gt;. So we can quickly find out how many bytes they have in common as prefix. In this case, it is 4 bytes.&lt;/p&gt;
+
+&lt;p&gt;What if we found no match or a bad match (a match that shares less than some threshold)? Well, then we write it as literal until a good match is found.&lt;/p&gt;
+
+&lt;p&gt;As you may notice, the dictionary grows linearly. As such, it is important that you reduce memory once in a while, by trimming it. Note that just trimming the first (or last) &lt;span  class=&#34;math&#34;&gt;\(N\)&lt;/span&gt; entries is inefficient, because some might be used often. Instead, a &lt;a href=&#34;https://en.wikipedia.org/wiki/Cache_Replacement_Policies&#34;&gt;cache replacement policy&lt;/a&gt; should be used. If the dictionary is filled, the cache replacement policy should determine which match should be replaced. I&#39;ve found PLRU a good choice of CRP for LZ4 compression.&lt;/p&gt;
+
+&lt;p&gt;Note that you should add additional rules like being addressible (within &lt;span  class=&#34;math&#34;&gt;\(2^{16} + 4\)&lt;/span&gt; bytes of the cursor, which is required because &lt;span  class=&#34;math&#34;&gt;\(O\)&lt;/span&gt; is 16-bit) and being above some length (smaller keys have worse block-level compression ratio).&lt;/p&gt;
+
+&lt;p&gt;Another faster but worse (compression-wise) approach is hashing every four bytes and placing them in a table. This means that you can only look up the latest sequence given some 4-byte prefix. Looking up allows you to progress and see how long the duplicate sequence match. When you can&#39;t go any longer, you encode the literals section until another duplicate 4-byte is found.&lt;/p&gt;
+
+&lt;h1 id=&#34;conclusion&#34;&gt;Conclusion&lt;/h1&gt;
+
+&lt;p&gt;LZ4 is a reasonably simple algorithm with reasonably good compression ratio. It is the type of algorithm that you can implement on an afternoon without much complication.&lt;/p&gt;
+
+&lt;p&gt;If you need a portable and efficient compression algorithm which can be implement in only a few hundreds of lines, LZ4 would be my go-to.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>
