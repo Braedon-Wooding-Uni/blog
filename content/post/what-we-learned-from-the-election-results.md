@@ -5,7 +5,7 @@ title: "What we learned from the election results"
 description: "It was surprising victory, but why?"
 comments: true
 featured: true
-image: /thumb/what-we-have-learned-from-the-election-results.png
+image: /thumb/what-we-learned-from-the-election-results.png
 slug: what-we-have-learned-from-the-election-results
 tags:
     - politics
