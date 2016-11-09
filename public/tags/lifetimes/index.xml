@@ -11,10 +11,10 @@
     
     <item>
       <title>Lambda crabs (part 1): A mathematical introduction to lifetimes and regions</title>
-      <link>http://ticki.github.io/blog/lambda_crabs_1/</link>
+      <link>http://ticki.github.io/blog/lambda-crabs-part-1-a-mathematical-introduction-to-lifetimes-and-regions/</link>
       <pubDate>Mon, 06 Jun 2016 09:12:56 +0200</pubDate>
       
-      <guid>http://ticki.github.io/blog/lambda_crabs_1/</guid>
+      <guid>http://ticki.github.io/blog/lambda-crabs-part-1-a-mathematical-introduction-to-lifetimes-and-regions/</guid>
       <description>
 
 &lt;p&gt;This post will cover lifetimes and regions in depth, with a focus on the mathematical background of regions. That is, what is a region? What rules do they follow? How does the compiler handle them? And how are they inferred?&lt;/p&gt;

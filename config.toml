@@ -18,9 +18,12 @@ disqus_identifier = "http-ticki-github-io"
 [[menu.main]]
     name = "GitHub"
     url = "https://github.com/ticki"
+[[menu.main]]
+    name = "Twitter"
+    url = "https://twitter.com/ticki_"
 [[menu.rss]]
-    name = "/index.xml"
-    url = "https://github.com/ticki"
+    name = "Feed"
+    url = "/index.xml"
 
 [indexes]
   tag = "tags"

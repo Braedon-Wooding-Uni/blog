@@ -11,10 +11,10 @@
     
     <item>
       <title>A Critique of Rust&#39;s `std::collections`</title>
-      <link>http://ticki.github.io/blog/horrible/</link>
+      <link>http://ticki.github.io/blog/a-critique-of-rusts-stdcollections/</link>
       <pubDate>Mon, 12 Sep 2016 22:50:08 +0200</pubDate>
       
-      <guid>http://ticki.github.io/blog/horrible/</guid>
+      <guid>http://ticki.github.io/blog/a-critique-of-rusts-stdcollections/</guid>
       <description>
 
 &lt;p&gt;Rust is by far my favorite language, and I am very familiar with it, but there is one aspect that annoys me at times: &lt;code&gt;std::collections&lt;/code&gt;, a part of the opt-out standard library.&lt;/p&gt;

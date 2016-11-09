@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Ticki&#39;s blog</title>
-    <link>http://ticki.github.io/</link>
-    <description>Recent content on Ticki&#39;s blog</description>
+    <title>Posts on Ticki&#39;s blog</title>
+    <link>http://ticki.github.io/post/</link>
+    <description>Recent content in Posts on Ticki&#39;s blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <lastBuildDate>Fri, 04 Nov 2016 16:28:44 +0200</lastBuildDate>
-    <atom:link href="http://ticki.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="http://ticki.github.io/post/index.xml" rel="self" type="application/rss+xml" />
     
     <item>
       <title>Designing a good non-cryptographic hash function</title>
@@ -1558,24 +1558,6 @@ define insert(elem, root, height, level):
 &lt;p&gt;By apply a lot of small, subtle tricks, we can drastically improve performance of skip lists, providing a simpler and faster alternative to Binary Search Trees. Many of these are really just minor tweaks, but give an absolutely enormous speed-up.&lt;/p&gt;
 
 &lt;p&gt;The diagrams were made with &lt;a href=&#34;https://en.wikipedia.org/wiki/Dia_(software)&#34;&gt;Dia&lt;/a&gt; and &lt;a href=&#34;https://en.wikipedia.org/wiki/PGF/TikZ&#34;&gt;TikZ&lt;/a&gt;.&lt;/p&gt;
-</description>
-    </item>
-    
-    <item>
-      <title>About me</title>
-      <link>http://ticki.github.io/about/</link>
-      <pubDate>Wed, 14 Sep 2016 22:50:08 +0200</pubDate>
-      
-      <guid>http://ticki.github.io/about/</guid>
-      <description>&lt;p&gt;I&amp;rsquo;m Ticki, this blog is about programming, mathematics, and politics.&lt;/p&gt;
-
-&lt;p&gt;People in the Rust community might know my for &lt;a href=&#34;https://github.com/redox-os/redox&#34;&gt;Redox OS&lt;/a&gt;, &lt;a href=&#34;https://github.com/ticki/termion&#34;&gt;Termion&lt;/a&gt;, and &lt;a href=&#34;https://github.com/ticki/rfcs/blob/pi-types/text/0000-pi-types.md&#34;&gt;the Π-type RFC&lt;/a&gt;.&lt;/p&gt;
-
-&lt;p&gt;My primary interests are OS development, algorithms, and type systems.&lt;/p&gt;
-
-&lt;p&gt;For questions, errata, or critcism, please write to me at the Mozilla IRC (my username is &lt;code&gt;ticki&lt;/code&gt;).&lt;/p&gt;
-
-&lt;p&gt;Everything written on this blog should be considered MIT-licensed.&lt;/p&gt;
 </description>
     </item>
     

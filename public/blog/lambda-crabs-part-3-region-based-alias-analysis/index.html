@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en-us">
 
@@ -6,18 +7,31 @@
         <meta charset="utf-8" />
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
-        <meta property="og:title" content=" Mathematics &middot;  Ticki&#39;s blog" />
+        <meta property="og:title" content=" Lambda crabs (part 3): Region-based alias analysis &middot;  Ticki&#39;s blog" />
         <meta property="og:site_name" content="Ticki&#39;s blog" />
-        <meta property="og:url" content="http://ticki.github.io/tags/mathematics/" />
+        <meta property="og:url" content="http://ticki.github.io/blog/lambda-crabs-part-3-region-based-alias-analysis/" />
 
     
-        <meta property="og:type" content="website" />
+        <meta property="og:type" content="article" />
+        <meta property="og:article:published_time" content="2016-06-08T11:24:24&#43;02:00" />
+        <meta property="og:article:tag" content="lambda-crabs" />
+        <meta property="og:article:tag" content="rust" />
+        <meta property="og:article:tag" content="mathematics" />
+        <meta property="og:article:tag" content="pointers" />
+        
+
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:site" content="@ticki_" />
+        <meta name="twitter:creator" content="@ticki_" />
+        <meta name="twitter:title" content="Lambda crabs (part 3): Region-based alias analysis" />
+        <meta name="twitter:description" content="In this post, we show how you can analyse alias properties through region data." />
+        <meta name="twitter:url" content="http://ticki.github.io/blog/lambda-crabs-part-3-region-based-alias-analysis/" />
     
 
-        <title> Mathematics &middot;  Ticki&#39;s blog</title>
+        <title> Lambda crabs (part 3): Region-based alias analysis &middot;  Ticki&#39;s blog</title>
 
     
-        <meta name="description" content="This blog contains my thoughts, ideas, and humble discoveries in mathematics and computer science." />
+        <meta name="description" content="In this post, we show how you can analyse alias properties through region data." />
     
 
         <meta name="p:domain_verify" content="fc173d84e3a4de948ed4bda2908afd3e"/>
@@ -33,10 +47,35 @@
     
 
     
-        <link href="http://ticki.github.io/tags/mathematics/index.xml" rel="alternate" type="application/rss+xml" title="Mathematics &middot; Ticki&#39;s blog" />
-    
-        <link rel="canonical" href="http://ticki.github.io/tags/mathematics/" />
+        <link rel="canonical" href="http://ticki.github.io/blog/lambda-crabs-part-3-region-based-alias-analysis/" />
 
+    
+    <script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "Article",
+        "headline": "Lambda crabs (part 3): Region-based alias analysis",
+        "author": {
+            "@type": "Person",
+            "name": "http://profiles.google.com/?rel=author"
+        },
+        "datePublished": "2016-06-08",
+        "description": "In this post, we show how you can analyse alias properties through region data.",
+        "wordCount":  905 
+    }
+
+    </script>
+
+    <script type="text/javascript">
+    
+    
+      var disqus_shortname = 'http-ticki-github-io';
+      var disqus_identifier = 'http:\/\/ticki.github.io\/blog\/lambda-crabs-part-3-region-based-alias-analysis\/';
+      var disqus_title = 'Lambda crabs (part 3): Region-based alias analysis';
+      var disqus_url = 'http:\/\/ticki.github.io\/blog\/lambda-crabs-part-3-region-based-alias-analysis\/';
+    
+
+    </script>
     
 
     <style>
@@ -59,9 +98,11 @@
 			  	    
             </div>
             <div class="nav-menu">
-              <a class="rss" href="http://ticki.github.io/tags/mathematics/index.xml">
+              <a class="rss" href="">
                 <i class="icon-rss"></i>
               </a>
+                
+                <a class="menu" data-action="toc" data-target="toc"><i class="icon-location"></i></a>
                 
                 
                 <a class="menu" data-action="menu" data-target="menu"><i class="icon-menu"></i></a>
@@ -70,112 +111,270 @@
           </nav>
 
 
-<header id="header" class="header has-cover">
-	<div class="inner">
-		<a class="header-title" href="http://ticki.github.io/">
-			<h1 class="header-name">Mathematics</h1>
-		</a>
-	</div>
-	
-	<div class="header-cover" style="background-image: url(/cover.png)"></div>
-	
-</header>
+<main class="content" role="main">
+	<article class="post">
+		<div class="inner">
 
-	<div id="post-index" class="container">
+			<div id="push">
 
-		<main class="content" role="main">
+  			<header class="post-header">
+  				<span class="post-meta">
+						<span class="post-date">8 Jun 2016</span> <span class="reading-time">| <span class="estimated-reading-time">5 min.</span> (<span class="word-count">905</span> words)</span></span>
+  				</span>
+  				<div class="clear"></div>
+  				<h1 class="post-title">Lambda crabs (part 3): Region-based alias analysis</h1>
+  			</header>
 
-			<div class="post-list">
-				<div id="push">
+  			<section class="post-content">
+  				
 
-			
+<p>In the <a href="http://ticki.github.io/blog/lambda_crabs_2/">last post</a>, we saw how to
+infer regions and their span. In this post, we will cover aliasing and how to
+ensure guarantees through region analysis.</p>
 
-			
-			  
-<article class="post featured">
+<h2 id="aliasing-mutable-aliasing-and-unsafety">Aliasing, mutable aliasing, and unsafety.</h2>
 
-	<div class="inner">
-		<a class="post-link" href="http://ticki.github.io/blog/a-hoare-logic-for-rust/"></a>
-		
-		<figure class="post-image">
-			<a href="http://ticki.github.io/blog/a-hoare-logic-for-rust/"><img src="/thumb/a-hoare-logic-for-rust.png" alt="" /></a>
-		</figure>
-		
-		<span class="post-meta">
-			<span class="post-date">24 Sep 2016</span>
-		</span>
-		<h2 class="post-title"><a href="http://ticki.github.io/blog/a-hoare-logic-for-rust/">A Hoare Logic for Rust</a></h2>
-		<p class="post-excerpt">In this post, I introduce a Hoare logic specifically for the Rust MIR.&hellip;</p>
-		<span class="post-more"><a href="http://ticki.github.io/blog/a-hoare-logic-for-rust/">Read More <i class="icon-arrow-right"></i></a></span>
-	</div>
-</article>
+<p>Two pointers are said to be <em>aliased</em>, if they refer to the same object. Alias
+analysis is essential to program verification, optimizers, and compiler theory.</p>
 
-			
-			  
-<article class="post">
+<p>Alias analysis is the study of which pointers are aliased and, more
+importantly, which pointers <em>aren&rsquo;t aliased</em>.</p>
 
-	<div class="inner">
-		<a class="post-link" href="http://ticki.github.io/blog/lambda-crabs-part-3-region-based-alias-analysis/"></a>
-		
-		<span class="post-meta">
-			<span class="post-date">8 Jun 2016</span>
-		</span>
-		<h2 class="post-title"><a href="http://ticki.github.io/blog/lambda-crabs-part-3-region-based-alias-analysis/">Lambda crabs (part 3): Region-based alias analysis</a></h2>
-		<p class="post-excerpt">In this post, we show how you can analyse alias properties through region data.&hellip;</p>
-		<span class="post-more"><a href="http://ticki.github.io/blog/lambda-crabs-part-3-region-based-alias-analysis/">Read More <i class="icon-arrow-right"></i></a></span>
-	</div>
-</article>
+<p>Rust guarantees that no mutable reference is aliased. This is statically
+checked, and we will show how in this post.</p>
 
-			
-			  
-<article class="post">
+<p>So, why is aliasing guarantees even needed?</p>
 
-	<div class="inner">
-		<a class="post-link" href="http://ticki.github.io/blog/lambda-crabs-part-2-region-inference-is-not-magic./"></a>
-		
-		<span class="post-meta">
-			<span class="post-date">6 Jun 2016</span>
-		</span>
-		<h2 class="post-title"><a href="http://ticki.github.io/blog/lambda-crabs-part-2-region-inference-is-not-magic./">Lambda crabs (part 2): Region inference is (not) magic.</a></h2>
-		<p class="post-excerpt">I go through the solution to our optimization problem presented in last post. This provides an full algorithm for inference of regions.&hellip;</p>
-		<span class="post-more"><a href="http://ticki.github.io/blog/lambda-crabs-part-2-region-inference-is-not-magic./">Read More <i class="icon-arrow-right"></i></a></span>
-	</div>
-</article>
+<p>The answer is that I need to be able to reason about the invariants of the
+pointers content, while being sure that those aren&rsquo;t broken in the period of
+accessibility.</p>
 
-			
-			  
-<article class="post">
+<p>Furthermore, we want strict thread-safety, which requires guarantees about
+shared mutable state.</p>
 
-	<div class="inner">
-		<a class="post-link" href="http://ticki.github.io/blog/lambda-crabs-part-1-a-mathematical-introduction-to-lifetimes-and-regions/"></a>
-		
-		<span class="post-meta">
-			<span class="post-date">6 Jun 2016</span>
-		</span>
-		<h2 class="post-title"><a href="http://ticki.github.io/blog/lambda-crabs-part-1-a-mathematical-introduction-to-lifetimes-and-regions/">Lambda crabs (part 1): A mathematical introduction to lifetimes and regions</a></h2>
-		<p class="post-excerpt">In this post, I go through the theoretical foundation of region-based memory management.&hellip;</p>
-		<span class="post-more"><a href="http://ticki.github.io/blog/lambda-crabs-part-1-a-mathematical-introduction-to-lifetimes-and-regions/">Read More <i class="icon-arrow-right"></i></a></span>
-	</div>
-</article>
+<h2 id="different-values-different-namespaces">Different values, different namespaces</h2>
 
-			
+<p>To reason about mutability overlaps and aliasing through regions, we need a
+notion of different namespaces.</p>
 
-				</div>
+<p>For example, say some variable X is referenced in a lifetime <code>'a</code>. Does that
+mean another variable Y living in the same scope can&rsquo;t be mutated?</p>
+
+<p>Of course not! Let&rsquo;s consider:</p>
+
+<pre><code class="language-rust">{
+    let mut a = 2; // ------+ 'a
+    let b = &amp;a;    // ----+ | 'b
+    let mut c = 0; // --+ | | 'c
+    c = 1;         //   | | |
+    c = 2;         //   | | |
+} // -------------------+-+-+
+</code></pre>
+
+<p>As you can see <code>a</code> is aliased, thus mutating it is not allowed. However, <code>'a:
+'c</code>, but that doesn&rsquo;t mean they refer to the same.</p>
+
+<p>Holding a global namespace would make the above example fail, since it has no
+distinction between <code>a</code> and <code>c</code> and their respective lifetimes.</p>
+
+<p>For that reason, we need to segregate the regions, such that we can effectively
+reason about aliasing without mixing values up.</p>
+
+<h2 id="sublattices">Sublattices</h2>
+
+<p>We talked a bit about lattices and their applications in the last part. I
+recommend reading that if you do not know what a lattice is.</p>
+
+<p>Now, let&rsquo;s introduce the notion of a <em>sublattice</em>:</p>
+
+<p><em>M</em> is a sublattice of <em>L</em>, if <em>M</em> is a nonempty subset of <em>L</em> forming a
+lattice under <em>L</em>&rsquo;s meet and join operators.</p>
+
+<p>Take a lattice,</p>
+
+<pre><code>       Join(a, b, c)
+           /\
+          /  \
+         /    \
+   Join(a, b)  \c
+       /\      /
+      /  \    /
+     /    \  /
+   a/      \/b
+    \      /
+     \    /
+      \  /
+       \/
+    Meet(a, b)
+</code></pre>
+
+<p>(by the way, this is why it is called a lattice)</p>
+
+<p>then</p>
+
+<pre><code>   Join(a, b)
+       /\
+      /  \
+     /    \
+  a /      \b
+    \      /
+     \    /
+      \  /
+       \/
+    Meet(a, b)
+</code></pre>
+
+<p>is a sublattice, since it holds all the conditions:</p>
+
+<ol>
+<li><p>It is a nonempty subset.</p></li>
+
+<li><p>It shares meet and join, while preserving closure (you can easily check this
+yourself).</p></li>
+</ol>
+
+<h2 id="region-classes">Region classes</h2>
+
+<p>Region classes has many names, but none which is universally agreed upon, I
+prefer the name region classes. As we say, a rose by any other name would still
+smell as sweet.</p>
+
+<p>Let <em>L</em> be our region lattice, define a <em>region class</em> of <em>L</em> as a sublattice
+of <em>L</em>, in the context of segregating regions.</p>
+
+<p>In particular, assign each value a region class. Say the value has the bounds
+(outlives) <code>{a, b, c, d...}</code>, then we derive our region class as the cyclic
+sublattice, <code>&lt;a, b, c, d...&gt;</code>. In particular, this means <em>the smallest
+extension which forms a sublattice of L</em>.</p>
+
+<p>The compiler keeps a log of the region class of every variable. This is then
+used for alias analysis:</p>
+
+<h2 id="pointers-and-references">Pointers and references</h2>
+
+<p>Taking an immutable reference extends our region class to contain the region of
+this particular reference, denoted <code>M[N]</code>.</p>
+
+<p>Mutable references, on the other hand, works slightly different. The region
+class and the region of the reference <em>must be disjoint</em>, unless we get shared
+mutability. With this requirement satisfied, we can proceed to extend the
+region class with the new region.</p>
+
+<h2 id="mutating-a-local-variable">Mutating a local variable</h2>
+
+<p>You may ask, &ldquo;Can you mutate a local variable while it is borrowed?&rdquo;, the
+answer is, &ldquo;No, you cannot&rdquo;. The reason is the same for the mutable aliasing:
+it introduce shared mutable state.</p>
+
+<p>But, how do we handle such mutations?</p>
+
+<p>We introduced <code>empty(x)</code>, the empty region at <code>x</code>, in the earlier blog posts.
+And we can use this to interpret local mutations as well: as taking a mutable
+reference for region <code>empty(x)</code> and simply mutate it through the reference.</p>
+
+<h2 id="applying-this-method">Applying this method</h2>
+
+<p>If we get back to our example,</p>
+
+<pre><code class="language-rust">{
+    let mut a = 2; // ------+ 'a
+    let b = &amp;a;    // ----+ | 'b
+    let mut c = 0; // --+ | | 'c
+    c = 1;         //   | | |
+    c = 2;         //   | | |
+} // -------------------+-+-+
+</code></pre>
+
+<p>We can see that the region class of <code>'a</code> is an extension of <code>'b</code>, but <code>'c</code> is
+not entangled with <code>'a</code>&rsquo;s region class. In particular, <code>'c</code> and <code>'a</code> belong to
+different namespaces and thus, there is no shared mutability.</p>
+
+<h2 id="region-classes-and-their-relations">Region classes and their relations</h2>
+
+<p>A natural question that arise is: Why don&rsquo;t we do region inference seperately
+for each region class?</p>
+
+<p>The answer is that distinct region classes are far from unrelated. Each region
+class simply defines a value and its aliases, but that doesn&rsquo;t make it isolated
+for the rest of <em>L</em>.</p>
+
+<p>If you look at our example above, you may notice that <code>'a</code> outlives <code>'c</code>,
+despite being associated with a different region class.</p>
+
+<h2 id="questions-and-errata">Questions and errata</h2>
+
+<p>Ping me at #rust in Mozilla IRC.</p>
+
+  			</section>
+
+  			<footer class="post-footer">
+  				<div class="post-tags">
+            
+            
+                <a href="http://ticki.github.io//tags/lambda-crabs/">lambda-crabs</a>
+            
+                <a href="http://ticki.github.io//tags/rust/">rust</a>
+            
+                <a href="http://ticki.github.io//tags/mathematics/">mathematics</a>
+            
+                <a href="http://ticki.github.io//tags/pointers/">pointers</a>
+            
+            
+  				</div>
+  				<div class="post-share">
+  					<a class="icon-twitter" href="https://twitter.com/share?text=Lambda%20crabs%20%28part%203%29%3a%20Region-based%20alias%20analysis&url=http%3a%2f%2fticki.github.io%2fblog%2flambda-crabs-part-3-region-based-alias-analysis%2f" onclick="window.open(this.href, 'twitter-share', 'width=550,height=235');return false;">
+  						<span>Twitter</span>
+  					</a>
+  					<a class="icon-facebook" href="https://www.facebook.com/sharer/sharer.php?u=http%3a%2f%2fticki.github.io%2fblog%2flambda-crabs-part-3-region-based-alias-analysis%2f" onclick="window.open(this.href, 'facebook-share','width=580,height=296');return false;">
+  						<span>Facebook</span>
+  					</a>
+  					<a class="icon-gplus" href="https://plus.google.com/share?url=http%3a%2f%2fticki.github.io%2fblog%2flambda-crabs-part-3-region-based-alias-analysis%2f" onclick="window.open(this.href, 'google-plus-share', 'width=490,height=530');return false;">
+  						<span>Google+</span>
+  					</a>
+  				</div>
+  			</footer>
+
+  			<aside class="post-comments">
+    
+    
+    <div id="disqus_thread"></div>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+    
+</aside>
+
+
 			</div>
 
-			<nav id="pagination" class="pagination" role="pagination">
-	<div class="inner">
-	
-		<span class="pagination-info">Page 1 of 1</span>
-	
-		<div class="clear"></div>
-	</div>
-</nav>
+			<nav class="post-nav">
+				
+					<a class="post-nav-item post-nav-next" href="http://ticki.github.io/blog/a-critique-of-rusts-stdcollections/">
+						<section class="post-nav-teaser">
+							<span class="post-nav-icon"><i class="icon-arrow-left"></i></span>
+							<span class="post-nav-info">
+								<h4 class="post-nav-title">A Critique of Rust&#39;s `std::collections`</h4>
+								<p class="post-nav-excerpt">This is an in-depth critique of the bad parts of Rust&#39;s collection primitves.&hellip;</p>
+							</span>
+						</section>
+					</a>
+				
+				
+					<a class="post-nav-item post-nav-prev" href="http://ticki.github.io/blog/lambda-crabs-part-2-region-inference-is-not-magic./">
+						<section class="post-nav-teaser">
+							<span class="post-nav-icon"><i class="icon-arrow-right"></i></span>
+							<span class="post-nav-info">
+								<h4 class="post-nav-title">Lambda crabs (part 2): Region inference is (not) magic.</h4>
+								<p class="post-nav-excerpt">I go through the solution to our optimization problem presented in last post. This provides an full algorithm for inference of regions.&hellip;</p>
+							</span>
+						</section>
+					</a>
+				
+				<div class="clear"></div>
+			</nav>
 
-
-		</main>
-
-	</div>
+		</div>
+	</article>
+</main>
 
 				<div id="body-class" style="display: none;"></div>
 				<footer id="footer">
@@ -210,6 +409,31 @@
 </div>
 
 				
+<div id="tocMenu" data-target="toc">
+    <div class="menu-header">
+        <span class="menu-label">Menu</span>
+        <a class="menu-close" data-action="toc" data-target="toc"></a>
+    </div>
+    <div id="toc" class="menu-list">
+        <nav id="TableOfContents">
+<ul>
+<li>
+<ul>
+<li><a href="#aliasing-mutable-aliasing-and-unsafety">Aliasing, mutable aliasing, and unsafety.</a></li>
+<li><a href="#different-values-different-namespaces">Different values, different namespaces</a></li>
+<li><a href="#sublattices">Sublattices</a></li>
+<li><a href="#region-classes">Region classes</a></li>
+<li><a href="#pointers-and-references">Pointers and references</a></li>
+<li><a href="#mutating-a-local-variable">Mutating a local variable</a></li>
+<li><a href="#applying-this-method">Applying this method</a></li>
+<li><a href="#region-classes-and-their-relations">Region classes and their relations</a></li>
+<li><a href="#questions-and-errata">Questions and errata</a></li>
+</ul></li>
+</ul>
+</nav>
+    </div>
+</div>
+
 
 				<div class="overlay"></div>
 			</div>

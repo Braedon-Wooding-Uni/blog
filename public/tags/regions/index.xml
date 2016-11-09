@@ -11,10 +11,10 @@
     
     <item>
       <title>Lambda crabs (part 2): Region inference is (not) magic.</title>
-      <link>http://ticki.github.io/blog/lambda_crabs_2/</link>
+      <link>http://ticki.github.io/blog/lambda-crabs-part-2-region-inference-is-not-magic./</link>
       <pubDate>Mon, 06 Jun 2016 11:06:21 +0200</pubDate>
       
-      <guid>http://ticki.github.io/blog/lambda_crabs_2/</guid>
+      <guid>http://ticki.github.io/blog/lambda-crabs-part-2-region-inference-is-not-magic./</guid>
       <description>
 
 &lt;p&gt;This post will cover region (lifetime) inference with a mathematical and type
@@ -195,10 +195,10 @@ in only a 100-200 lines.&lt;/p&gt;
     
     <item>
       <title>Lambda crabs (part 1): A mathematical introduction to lifetimes and regions</title>
-      <link>http://ticki.github.io/blog/lambda_crabs_1/</link>
+      <link>http://ticki.github.io/blog/lambda-crabs-part-1-a-mathematical-introduction-to-lifetimes-and-regions/</link>
       <pubDate>Mon, 06 Jun 2016 09:12:56 +0200</pubDate>
       
-      <guid>http://ticki.github.io/blog/lambda_crabs_1/</guid>
+      <guid>http://ticki.github.io/blog/lambda-crabs-part-1-a-mathematical-introduction-to-lifetimes-and-regions/</guid>
       <description>
 
 &lt;p&gt;This post will cover lifetimes and regions in depth, with a focus on the mathematical background of regions. That is, what is a region? What rules do they follow? How does the compiler handle them? And how are they inferred?&lt;/p&gt;

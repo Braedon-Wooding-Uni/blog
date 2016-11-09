@@ -11,10 +11,10 @@
     
     <item>
       <title>Lambda crabs (part 2): Region inference is (not) magic.</title>
-      <link>http://ticki.github.io/blog/lambda_crabs_2/</link>
+      <link>http://ticki.github.io/blog/lambda-crabs-part-2-region-inference-is-not-magic./</link>
       <pubDate>Mon, 06 Jun 2016 11:06:21 +0200</pubDate>
       
-      <guid>http://ticki.github.io/blog/lambda_crabs_2/</guid>
+      <guid>http://ticki.github.io/blog/lambda-crabs-part-2-region-inference-is-not-magic./</guid>
       <description>
 
 &lt;p&gt;This post will cover region (lifetime) inference with a mathematical and type

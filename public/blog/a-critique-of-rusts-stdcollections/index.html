@@ -1,0 +1,584 @@
+
+<!DOCTYPE html>
+<html lang="en-us">
+
+    <head>
+
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+        <meta property="og:title" content=" A Critique of Rust&#39;s `std::collections` &middot;  Ticki&#39;s blog" />
+        <meta property="og:site_name" content="Ticki&#39;s blog" />
+        <meta property="og:url" content="http://ticki.github.io/blog/a-critique-of-rusts-stdcollections/" />
+
+    
+        <meta property="og:type" content="article" />
+        <meta property="og:article:published_time" content="2016-09-12T22:50:08&#43;02:00" />
+        <meta property="og:article:tag" content="rant" />
+        <meta property="og:article:tag" content="rust" />
+        <meta property="og:article:tag" content="critique" />
+        <meta property="og:article:tag" content="data-structures" />
+        
+
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:site" content="@ticki_" />
+        <meta name="twitter:creator" content="@ticki_" />
+        <meta name="twitter:title" content="A Critique of Rust&#39;s `std::collections`" />
+        <meta name="twitter:description" content="This is an in-depth critique of the bad parts of Rust&#39;s collection primitves." />
+        <meta name="twitter:url" content="http://ticki.github.io/blog/a-critique-of-rusts-stdcollections/" />
+    
+
+        <title> A Critique of Rust&#39;s `std::collections` &middot;  Ticki&#39;s blog</title>
+
+    
+        <meta name="description" content="This is an in-depth critique of the bad parts of Rust&#39;s collection primitves." />
+    
+
+        <meta name="p:domain_verify" content="fc173d84e3a4de948ed4bda2908afd3e"/>
+        <meta name="HandheldFriendly" content="True" />
+        <meta name="MobileOptimized" content="320" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        
+        
+
+    
+        <link href="http://ticki.github.io/index.xml" rel="alternate" type="application/rss+xml" title="Ticki&#39;s blog" />
+    
+
+    
+        <link rel="canonical" href="http://ticki.github.io/blog/a-critique-of-rusts-stdcollections/" />
+
+    
+    <script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "Article",
+        "headline": "A Critique of Rust\x27s `std::collections`",
+        "author": {
+            "@type": "Person",
+            "name": "http://profiles.google.com/?rel=author"
+        },
+        "datePublished": "2016-09-12",
+        "description": "This is an in-depth critique of the bad parts of Rust\x27s collection primitves.",
+        "wordCount":  3438 
+    }
+
+    </script>
+
+    <script type="text/javascript">
+    
+    
+      var disqus_shortname = 'http-ticki-github-io';
+      var disqus_identifier = 'http:\/\/ticki.github.io\/blog\/a-critique-of-rusts-stdcollections\/';
+      var disqus_title = 'A Critique of Rust\x27s `std::collections`';
+      var disqus_url = 'http:\/\/ticki.github.io\/blog\/a-critique-of-rusts-stdcollections\/';
+    
+
+    </script>
+    
+
+    <style>
+@charset "UTF-8";article,header,img,main,nav,section{display:block}blockquote,p,pre,ul{margin:2em auto}#wrapper,pre{width:100%;box-sizing:border-box}#nav,#wrapper,code{position:relative}#nav,body{background:#fff}#menu,blockquote,pre code{background:0 0}#menu,#menu .menu-header,#menu .menu-list,#wrapper,.post-nav .post-nav-item .post-nav-teaser .post-nav-info,blockquote,pre{box-sizing:border-box}img{border:0;max-width:100%;height:auto;margin:2.5em auto}html{font-family:sans-serif;-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%}code,pre{font-family:monospace,monospace;font-size:1em}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:300;src:local("Merriweather Sans Light"),local("MerriweatherSans-Light"),url(//fonts.gstatic.com/s/merriweathersans/v5/6LmGj5dOJopQKEkt88GowY_zIojJi0m4a5Z6tRh6itY.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:400;src:local("Merriweather Sans Regular"),local("MerriweatherSans-Regular"),url(//fonts.gstatic.com/s/merriweathersans/v5/AKu1CjQ4qnV8MUltkAX3sL2aU247V0zTzydO4RoO9Ok.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:700;src:local("Merriweather Sans Bold"),local("MerriweatherSans-Bold"),url(//fonts.gstatic.com/s/merriweathersans/v5/6LmGj5dOJopQKEkt88GowQfd-b-I5PxxcmB4_-MNcqw.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:normal;font-weight:800;src:local("Merriweather Sans ExtraBold"),local("MerriweatherSans-ExtraBold"),url(//fonts.gstatic.com/s/merriweathersans/v5/6LmGj5dOJopQKEkt88GowWT7sFQ1Iz1BbpcuCPlgc9Q.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:italic;font-weight:300;src:local("Merriweather Sans Light Italic"),local("MerriweatherSans-LightItalic"),url(//fonts.gstatic.com/s/merriweathersans/v5/nAqt4hiqwq3tzCecpgPmVX9UU5BmOJGkLxUCVv5VXdc.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:italic;font-weight:400;src:local("Merriweather Sans Italic"),local("MerriweatherSans-Italic"),url(//fonts.gstatic.com/s/merriweathersans/v5/3Mz4hOHzs2npRMG3B1ascf0KIgDhPIHb_R-SWdtqte8.woff) format("woff")}@font-face{font-family:'Merriweather Sans';font-style:italic;font-weight:700;src:local("Merriweather Sans Bold Italic"),local("MerriweatherSans-BoldItalic"),url(//fonts.gstatic.com/s/merriweathersans/v5/nAqt4hiqwq3tzCecpgPmVYM8pfYvjMoOxygpzLVILAs.woff) format("woff")}@font-face{font-family:Inconsolata;font-style:normal;font-weight:400;src:local("Inconsolata"),url(//fonts.gstatic.com/s/inconsolata/v12/BjAYBlHtW3CJxDcjzrnZCIbN6UDyHWBl620a-IRfuBk.woff) format("woff")}@font-face{font-family:Inconsolata;font-style:normal;font-weight:700;src:local("Inconsolata Bold"),local("Inconsolata-Bold"),url(//fonts.gstatic.com/s/inconsolata/v12/AIed271kqQlcIRSOnQH0yTqR_3kx9_hJXbbyU8S6IN0.woff) format("woff")}@font-face{font-family:icons;src:url(/fonts/icons.eot?9273991);src:url(/fonts/icons.eot?9273991#iefix) format("embedded-opentype"),url(/fonts/icons.woff?9273991) format("woff"),url(/fonts/icons.ttf?9273991) format("truetype"),url(/fonts/icons.svg?9273991#icons) format("svg");font-weight:400;font-style:normal}[class^=icon-]:before{font-family:icons;font-style:normal;font-weight:400;speak:none;display:inline-block;text-decoration:inherit;width:1em;margin-right:.2em;text-align:center;font-variant:normal;text-transform:none;line-height:1em;margin-left:.2em;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}.icon-arrow-left:before{content:'\e804'}.icon-arrow-right:before{content:'\e807'}.icon-rss:before{content:'\e808'}.icon-menu:before{content:'\e809'}body{margin:0;font:300 1em/1.5em 'Merriweather Sans',sans-serif;color:#595B66}blockquote,i{font-style:italic}code,pre{font-family:Inconsolata,monospace}a,blockquote,code,i{font-weight:400}::-moz-selection{color:#222;background:#D6EDFF;text-shadow:none}::-moz-selection,::selection{color:#222;background:#D6EDFF;text-shadow:none}a{background-color:transparent;color:inherit;text-decoration:none;transition:all ease-out .2s}.post-content a{border-bottom:2px solid #36D995}h1,h4{text-rendering:optimizeLegibility;color:#1F2026}h1{font-size:2em;line-height:1em;margin:2em 0 -.5em}h4{font-size:1.25em;line-height:1.2em;margin:2.4em 0 -.8em}ul{list-style:none;padding-left:3em}blockquote{padding:0 1em;border-left:.25em solid #D4D5D9;color:#595B66}blockquote *{margin:1em auto}blockquote :first-child{margin-top:0}blockquote :last-child{margin-bottom:0}i{color:#363740}code{display:inline-block;top:-1px;padding:3px 6px;margin:-1px 2px;font-size:.875em;line-height:1.143em;background:#E1E2E6;color:#000;border-radius:2px}pre{padding:1em;white-space:pre;overflow:auto;background:#9D9FA6;color:#fff}pre code{position:static;top:auto;font-size:1em;line-height:1.5em;white-space:-moz-pre-wrap;white-space:pre-wrap;vertical-align:inherit;border:none;padding:0}#menu .menu-header:before,.post .post-title:before{border-bottom:4px solid #36D995;content:''}.inner{max-width:48em;margin:0 auto;padding:0 1em}#wrapper{min-height:100vh;padding-bottom:6em;background:#F2F3F5}#push{-webkit-transform:translate3d(0,0,0);transform:translate3d(0,0,0);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;opacity:1}#nav{z-index:70;transition:all ease-out .4s;-webkit-transform:translate3d(0,0,0);transform:translate3d(0,0,0);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;opacity:1}#nav:after{clear:both;content:'';display:table}#nav .nav-logo{float:left;height:2em;padding:1em;max-width:50%}#nav .nav-logo img{width:auto;max-width:none;height:2em;margin:0}#nav .nav-menu{float:right}#nav .nav-menu:after{clear:both;content:'';display:table}#nav .nav-menu a{display:block;width:1em;height:1em;line-height:1em;padding:1.5em;text-align:center;float:left;cursor:pointer}#nav .nav-menu a i:before{margin:auto}#menu{display:none;position:fixed;left:50%;top:5%;width:30em;height:90%;margin-left:-15em;padding:3em 0 0;overflow:hidden;transition:all ease-out .3s;-webkit-transform:translate3d(0,2em,0);transform:translate3d(0,2em,0);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;opacity:0;z-index:100}@media only screen and (max-width:50em){#menu{width:90%;left:5%;margin-left:auto}}#menu .menu-header{position:absolute;left:0;top:0;width:100%;height:3.5em;padding:1em 1.5em .5em;margin-bottom:1em;line-height:2em;z-index:110;background:#fff}#menu .menu-header:before{position:absolute;left:-5%;bottom:-1em;width:110%;height:2em;background:#fff;box-shadow:0 .125em .125em rgba(0,0,0,.1);-webkit-transform:rotate(2.5deg);transform:rotate(2.5deg);transition:all ease-out .2s;z-index:115}#menu .menu-header:after{clear:both;content:'';display:table}#menu .menu-header .menu-label{position:relative;display:block;float:left;z-index:120}#menu .menu-header .menu-close{position:relative;display:block;float:right;width:2em;height:2em;padding:1em;margin:-1em -1.5em -1em 0;cursor:pointer;z-index:125}#menu .menu-header .menu-close:after,#menu .menu-header .menu-close:before{content:'';position:absolute;left:50%;top:50%;background:#9D9FA6;-webkit-transform:rotate(45deg);transform:rotate(45deg)}.overlay,.overlay:before{top:0;width:100%;height:100%}#menu .menu-header .menu-close:after{width:2px;height:1em;margin:-.5em 0 0 -1px}#menu .menu-header .menu-close:before{width:1em;height:2px;margin:-1px 0 0 -.5em}#menu .menu-list{position:relative;list-style:none;margin:0;padding:2em 0;height:100%;overflow-x:hidden;overflow-y:scroll;background:#fff}.overlay{position:fixed;left:0;z-index:80;display:none}.overlay:before{content:'';position:absolute;left:0;background:#1F2026;opacity:0;transition:all ease-out .3s;-webkit-transform-style:preserve-3d;transform-style:preserve-3d}.post{position:relative;z-index:20}.post .post-meta{display:block;font-size:.75em;line-height:1.334em;font-weight:400;margin-bottom:1.334em}.post .post-title{position:relative;color:#000;font-size:2em;line-height:1.375em;font-weight:800;text-indent:-1px;margin:.25em 0 .75em}.post .post-title:before{position:absolute;left:0;bottom:-.334em;width:1em;margin-bottom:-2px}.post .post-header{padding:4em 0 0;margin-bottom:3em}.post-footer .post-share a span{display:none}.post-nav .post-nav-item{position:fixed;top:50%;display:block;margin-top:-4em;overflow:hidden;border-radius:10em;transition:none}@media only screen and (max-width:70em){.post-nav .post-nav-item{position:absolute;top:auto;margin:auto;max-width:50%}}.post-nav .post-nav-item.post-nav-next{left:0;text-align:left}.post-nav .post-nav-item.post-nav-next .post-nav-icon{float:left}.post-nav .post-nav-item.post-nav-next .post-nav-icon i{left:-.05em}.post-nav .post-nav-item.post-nav-next .post-nav-info{padding-left:6em}.post-nav .post-nav-item.post-nav-prev{right:0;text-align:right}.post-nav .post-nav-item.post-nav-prev .post-nav-icon{float:right}.post-nav .post-nav-item.post-nav-prev .post-nav-icon i{right:-.05em}.post-nav .post-nav-item.post-nav-prev .post-nav-info{padding-right:6em}.post-nav .post-nav-item .post-nav-teaser{display:block;padding:1em;transition:all ease-out .2s;max-width:25em;overflow:visible}.post-nav .post-nav-item .post-nav-teaser:after{clear:both;content:'';display:table}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon{display:block;width:5em;height:5em;line-height:5em;text-align:center;box-sizing:border-box;border-radius:10em;border:1px solid #36D995;box-shadow:0 0 0 0 transparent;transition:all ease-out .1s;background:#F2F3F5}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon i{position:relative;font-size:2em}@media only screen and (max-width:30em){.post-nav .post-nav-item .post-nav-teaser .post-nav-icon{width:4em;height:4em;line-height:4em}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon i{font-size:1.5em}}.post-nav .post-nav-item .post-nav-teaser .post-nav-icon i:before{margin:auto}.post-nav .post-nav-item .post-nav-teaser .post-nav-info{display:none;width:100%;transition:all ease-out .2s}.post-nav .post-nav-item .post-nav-teaser .post-nav-info .post-nav-title{display:block;max-height:1.25em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:1.25em 0 .25em;font-size:1em;line-height:1.25em;font-weight:700;color:#363740}.post-nav .post-nav-item .post-nav-teaser .post-nav-info .post-nav-excerpt{display:block;max-height:1.334em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0;font-size:.75em;line-height:1.334em;font-weight:400;color:#9D9FA6}
+</style>
+
+
+    </head>
+    <body class="home-template" style="display: none;">
+      <section id="wrapper">
+        <div id="ajax-container">
+          <nav id="nav" class="nav">
+            <div class="nav-logo">
+              <a href="http://ticki.github.io/">
+      			  	
+      			  	
+      			  	<img src="/logo.png" alt="Logo"/>
+      			  	
+              </a>
+			  	    
+            </div>
+            <div class="nav-menu">
+              <a class="rss" href="">
+                <i class="icon-rss"></i>
+              </a>
+                
+                <a class="menu" data-action="toc" data-target="toc"><i class="icon-location"></i></a>
+                
+                
+                <a class="menu" data-action="menu" data-target="menu"><i class="icon-menu"></i></a>
+                
+            </div>
+          </nav>
+
+
+<main class="content" role="main">
+	<article class="post">
+		<div class="inner">
+
+			<div id="push">
+
+  			<header class="post-header">
+  				<span class="post-meta">
+						<span class="post-date">12 Sep 2016</span> <span class="reading-time">| <span class="estimated-reading-time">17 min.</span> (<span class="word-count">3438</span> words)</span></span>
+  				</span>
+  				<div class="clear"></div>
+  				<h1 class="post-title">A Critique of Rust&#39;s `std::collections`</h1>
+  			</header>
+
+  			<section class="post-content">
+  				
+
+<p>Rust is by far my favorite language, and I am very familiar with it, but there is one aspect that annoys me at times: <code>std::collections</code>, a part of the opt-out standard library.</p>
+
+<p>This post will go through the short-fallings of the API and implementation of <code>std::collections</code>. I&rsquo;ll try to present alternatives and way to improve it.</p>
+
+<p><strong>Update</strong>: The title was previously &ldquo;Why <code>std::collections</code> is absolutely horrible&rdquo;. It was in the hope to spark critical discussion, however people were rather annoyed by this title (and I understand why), so I changed it to something less provocative.</p>
+
+<h1 id="what-it-contains">What it contains</h1>
+
+<p><code>std::collections</code> has a rather small set of collections (which is a legitimate choice to make to preserve minimality), the catch being that it&rsquo;s an odd choice of collections:</p>
+
+<ol>
+<li>B-tree based map and set.</li>
+<li>Binary heap.</li>
+<li>Hash table and set.</li>
+<li>Doubly-linked list.</li>
+<li>Ring buffer.</li>
+<li>Random-acess vectors (strictly speaking not in <code>std::collections</code> but instead in <code>std::vec</code>).</li>
+</ol>
+
+<p>That seems fine, doesn&rsquo;t it? No, it doesn&rsquo;t. If you consider what it lacks of these are very weird choices of structures.</p>
+
+<p>Take binary heap. It is incredibly useful at times, but is it really fit for a standard library with focus on being minimal? Let&rsquo;s look at the statistics:</p>
+
+<p>444 examples of usage of this structure (in Rust) on GitHub. Now, we obviously cannot be sure that this sample is representative, but it should give a pretty good insight on the usage.</p>
+
+<p>Looking through these, approximately 50 of these are tests of <code>BinaryHeap</code> itself. Another 50 are reimplementations of it. Around 100 of them are duplicates of other codes (e.g. downloaded libraries). This leaves us with around 250 usages, and that&rsquo;s only slightly more than the incredibly useful <code>VecMap</code>, which isn&rsquo;t even in the standard library!</p>
+
+<p>If minimalism really is a goal (which I am going to criticize in a minute), it seems rather weird to have a collection which is barely used more than a non-libstd collection.</p>
+
+<p>Let&rsquo;s move on to doubly-linked list. Searching on GitHub gives you 534 results. I was unable to find <em>a single place where it was used in a manner that could not be replaced by singly-linked lists</em>. Chances are that there are some, but they&rsquo;re incredibly rare, and it is odd given that there are no singly-linked list structures in the standard libraries.</p>
+
+<p><strong>Update</strong>: To clarify here. I&rsquo;m not arguing that the primitives I propose later deserves a place above these, rather that for a minimal set of collections, the choice is rather odd, given that some collections are even more common than some of these.</p>
+
+<h1 id="what-it-doesn-t-contain">What it doesn&rsquo;t contain</h1>
+
+<h2 id="concurrent-data-structures">Concurrent data structures</h2>
+
+<p><img src="https://i.imgur.com/GmoylkC.png" alt="How it compares" /></p>
+
+<p>The whole standard library contains exactly two concurrent data structures (note that data structures are different from containers), namely the MPSC-queues (the blocking queue with a limited buffer and the non-blocking with an unlimited buffer). These are used for cross-thread message passing and the alike.</p>
+
+<p>But where are all the other concurrent primitives?</p>
+
+<p>People tend to wrap their structure in <code>Mutex</code>, like <code>Mutex&lt;HashMap&lt;...&gt;&gt;</code>, but that is often an order of magnitude slower than a concurrent hash table.</p>
+
+<p>Then there&rsquo;s the multithreaded push/pop stacks (as opposed to the queue/unqueue lists), and so on.</p>
+
+<p>There are quite a few implementations of structures as the ones described above, but they are more often than not poorly implemented. The leading library (which has a pretty good implementation quality) is <a href="https://github.com/aturon/crossbeam">crossbeam</a>, but unfortunately it only implements a very limited set of synchronization primitives (no maps, no tables, no skip lists, etc.).</p>
+
+<h2 id="singly-linked-lists">Singly linked lists</h2>
+
+<p>I&rsquo;ve already mentioned this, but singly linked list are often useful.</p>
+
+<h2 id="keyed-priority-queues">Keyed priority queues</h2>
+
+<p><img src="http://www.csit.parkland.edu/~mvanmoer/CSC220/2014/images/heap-9.2.f.jpg" alt="An example of a keyed heap" /></p>
+
+<p>Keyed priority queues is the structure everyone ask about and looks for, but no one can name it (here&rsquo;s an exercise: go on Google and try to vaguely describe this structure, you will for sure find at least one thread asking for exactly that description, and often no one is able to answer the question or misguidedly proposes binary heaps instead).</p>
+
+<p>Say you have an ordered list of elements, each of which has a priority. Now, you want to be able to retrieve the element with the highest or the lowest priority, with a reasonable performance. Note that mere heaps are not sufficient, since they are not arbitrarily ordered, in the sense that you cannot index them without traversing all elements.</p>
+
+<p><strong>Update</strong>: People think I&rsquo;m talking about binary heaps, but they&rsquo;re fundamentally very different. A keyed priority queue is some arbitrarily ordered list (or map) such that elements with high or low priority can be retrieved quickly. Binary heaps are not associative arrays or lists, they do not allow ordering of the elements, and are thus conceptually simpler than keyed priority queues. Note that keyed priority queues are almost always implemented with binary heaps as the backbone. See [this paper]() for an in-depth description of a general-purpose keyed priority queue</p>
+
+<p>Keyed priority queues are used everywhere from cache level regulation to efficient scheduling, and are in my opinion one of the most useful data structures of all.</p>
+
+<p>It is hard to find out exactly how much it is used in the Rust community, given its many names and reimplementations. Only 83 occurrences of the name &ldquo;PriorityQueue&rdquo; in Rust code can be found on GitHub, but I suspect the real number to be much higher.</p>
+
+<p>The most famous form of keyed priority queues are Fibonacci heaps, which are used in most major database systems, as well as the Linux scheduler, and many memory allocators.</p>
+
+<h2 id="treaps">Treaps</h2>
+
+<p><img src="http://bluehawk.monmouth.edu/rclayton/web-pages/s10-305-503/treapsf4.png" alt="Insertion in treaps" /></p>
+
+<p>Treaps are generally faster than other self-balanced trees (on the average), but the really killer feature is the bulk operations. These are highly efficient algorithms for union, intersections, and set differences.</p>
+
+<p>When the programmer is manipulating sets like this (union, intersections, and so on) and iterators aren&rsquo;t sufficient (i.e., it is for storage, not iteration), these can be incredibly useful as a high-performance data structure.</p>
+
+<h2 id="skip-lists">Skip lists</h2>
+
+<p><img src="http://igoro.com/wordpress/wp-content/uploads/2008/07/skiplist.png" alt="An illustration of skip lists" /></p>
+
+<p>Skip lists are more niche than the structures described above, but they have excellent performance characteristics.</p>
+
+<p>Skip lists are conceptually similar to N-ary trees, but in the representation of a list. They&rsquo;re a probabilistic data structure, which holds a list and some number of sublists such that the <em>n</em>&lsquo;th sublist is a sublist of the <em>n - 1</em>&lsquo;th sublist. Search can be visualized as binary search by observing how two paths can be taken: A) go to the next sublist B) follow the link.</p>
+
+<p>The reason a good implementation outperforms a good implementation of classical binary search trees has to do with two reasons:</p>
+
+<ol>
+<li><p>On average, 50% of the links followed under a search are cache local, whereas B-trees, for example, are around 20% (<strong>update</strong>: The original number said 0%, turns out my tests were wrong) cache local.</p></li>
+
+<li><p>No tree rotations or equivalent operations are needed during insertion.</p></li>
+</ol>
+
+<p>Skip lists has its use cases, and a <em>good implementation</em> (flat array, SLOBs, and unrolled lists) can easily outperform B-trees. For really big sets, however, skip lists tends to be slower due to not being as rigidly balanced.</p>
+
+<h2 id="self-balancing-trees">Self-balancing trees</h2>
+
+<p><img src="https://i.imgur.com/x4QQlZp.png" alt="An example of a left-leaning red-black tree" /></p>
+
+<p>As mentioned, Rust&rsquo;s standard library already has an excellent implementation of B-trees, a popular form of self-balancing trees.</p>
+
+<p>The other popular self-balancing trees are good candidates as well (AVL and LLRB/Red-black). While they do essentially the same, they can have very different performance characteristics, and switching can influence the program&rsquo;s performance vastly.</p>
+
+<p>Having a diverse set of such structures can be good, especially if the documentation details which one to use based on your use case.</p>
+
+<h2 id="slobs-aka-pointer-lists-memory-pools-typed-arenas-etc">SLOBs (aka. pointer lists, memory pools, typed arenas, etc.)</h2>
+
+<p><img src="https://i.imgur.com/MoaaFPc.png" alt="An example SLOB" /></p>
+
+<p>This is a very simple, and yet very powerful, data structure. In fact, they are nothing but a glorified singly linked list of pointers to some type. The dealbreaker is the fact that it requires no storage aside from the data it holds.</p>
+
+<p>That is, no allocation is needed to push and pop pointers from this list. This is possible by letting the data which is inactive hold the list itself.</p>
+
+<p>So what&rsquo;s the big deal here? It turns out to be extremely useful for region-based memory management. If you have a lot of allocations of the same type, it is often multiple orders of magnitude faster than allocating each of them seperately, and what&rsquo;s even cooler is the data locality it provides: Since it is based on one big contagious segment broken down into pieces, it will only cover a few pages, and consequently it is cache efficient (this fact will be abused in a minute).</p>
+
+<h1 id="we-can-just-leave-it-to-other-libraries">&ldquo;We can just leave it to other libraries&rdquo;</h1>
+
+<p>A common talking point is that we can simply outsource it to external libraries. Unfortunately, they cannot provide an essential property of the standard library: standardization. Standard libraries serves for making sure t
+he ecosystem is uniform. If something is crucial for keeping the ecosystem together, it deserves a place in the standard library. These are severely underused due to the stigma around adding new dependencies.</p>
+
+<p>Standardization is absolutely crucial for adoptation.</p>
+
+<h1 id="criticizing-the-structures-it-do-have">Criticizing the structures it do have</h1>
+
+<h2 id="hashmap"><code>HashMap</code></h2>
+
+<p><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Hash_table_5_0_1_1_1_1_0_SP.svg/380px-Hash_table_5_0_1_1_1_1_0_SP.svg.png" alt="Open addressing" /></p>
+
+<p>Rust&rsquo;s hash table implementation is perhaps the criticized part, not because it is a bad implementation, but because it is a very performance-critical component, and yet has its rough edges (including a, for some, odd choice of hash functions).</p>
+
+<p><strong>Update</strong>: The code is very well-written. The best way to study it is reading it. I recommend doing that.</p>
+
+<p>A quick overview of the Rust <code>HashMap</code>/<code>HashSet</code> implementation is:</p>
+
+<ul>
+<li>Open addressing (Robin Hood hashing)</li>
+<li>90.9% load factor before reallocation</li>
+<li>Defaults to Sip-hasher (cryptographic hash function)</li>
+</ul>
+
+<p>Let&rsquo;s just go through these one-by-one and see what&rsquo;s wrong:</p>
+
+<h3 id="robin-hood-hashing">Robin Hood hashing</h3>
+
+<p>Robin Hood hashing is a double-hashing variant quite, in which you rehash until the slot is free. Robin Hood hashing improves plain double-hashing by making sure the slots occupants are ordered by the probe length.</p>
+
+<p>So what&rsquo;s the problem here? Well, the cache efficiency is not exactly ideal, but we get freedom from clustering in return.</p>
+
+<p>The &ldquo;opposite&rdquo; approach is linear probing (where you add some constant - often 1 - to the slot number until it is free), which has the opposite nature: Cache efficiency is really good, but it is very sensitive to clustering.</p>
+
+<p>A reasonable alternative which takes the best of each of these solutions is quadratic probing, which simply uses a quadratic polynomial to jump between slots (or, in analogy to the one given above, the constant in question increases linearly).</p>
+
+<p>In most scenarios (especially for large tables), quadratic probing has fewer cache misses, due to better data locality.</p>
+
+<p>There&rsquo;s no reason to have strong opinions on this subject. The difference is rather small, but interesting nonetheless.</p>
+
+<p><strong>Update</strong>: As people pointed out, this section contains the error of confusing Rust&rsquo;s implementation of Robin Hood hashing with the original paper. In fact, it is very different: Rust&rsquo;s implementation doesn&rsquo;t rehash, but instead linearly probes, that simply makes the difference even smaller, and it makes it a pretty good choice. I don&rsquo;t know enough to be able to judge if it is better or worse than quadratic probing.</p>
+
+<h3 id="a-high-reallocation-threshold">A high reallocation threshold</h3>
+
+<p>This mostly comes down to a trade-off between between memory and CPU. If you think about it, 1:9 empty slots is a pretty dense table with an average probe length of 6 rehashes. Potentially (for very large tables) that can lead to 3-6 (avg. 3 or 4, depending on which test) cache misses for just a single lookup.</p>
+
+<p>The advantage is that it is relatively memory efficient, but that should really only be a concern for really big tables. For most tables, this is way too high, and it trades CPU cycles for memory (which is almost unimportant these days).</p>
+
+<p>I personally think that having a constant factor is a bad idea. I think it should be some function of the number of elements in the table, such that the factor is lower for small tables (where memory isn&rsquo;t a concern). This way you get memory efficiency when it matters.</p>
+
+<h3 id="sip-hasher">Sip-hasher</h3>
+
+<p><img src="https://i.imgur.com/smjww32.png" alt="A round of Sip" /></p>
+
+<p>Sip-hasher is a cryptographic hash function, and as with most cryptographic hash functions, it is slower than the non-cryptographic counterpart.</p>
+
+<p><strong>Update</strong>: Some people have pointed out that it is in fact not a cryptographic hash functions, but rather an efficient and yet sufficiently secure hash keyed function. In contrary to DJB2 or xxHash, it is not easy to invert/generate a preimage, which has the consequence of being hard to generate collisions on purpose, a property that can be important for publicly exposed structures (such as databases, KV stores for servers, etc.).</p>
+
+<p>And it doesn&rsquo;t even have a measurable better quality. I tried giving three different hash functions various data sets. Collision-wise they did equally on every data set, with exception of the English dictionary (as seen below). In every single test, my home-made hash function &ldquo;long hasher&rdquo; beats sip-hasher on performance <em>by a significant factor</em> (around 30%)&hellip;</p>
+
+<pre><code>~ SipHasher
+    Filled buckets: 2048
+    Max bucket: 245
+    Time: 0 s. 39232 ms.
+    GB/s: 0.8565382742517557
+~ DJB2
+    Filled buckets: 2048
+    Max bucket: 238
+    Time: 0 s. 39463 ms.
+    GB/s: 0.784737479297558
+~ LongHasher
+    Filled buckets: 2048
+    Max bucket: 239
+    Time: 0 s. 29562 ms.
+    GB/s: 4.95375004585191
+</code></pre>
+
+<p>Some investigation shows that the vast majority (98%) of the time of retrieval is used on hashing (it&rsquo;s not clear if the same is true for insertions, but it still have a major influence)). Say you used hash maps for caching database queries. That could potentially translate to 30% faster retrieval on cached queries.</p>
+
+<p>My point isn&rsquo;t that LongHasher is fantastic, but my point is that there are hash functions which vastly beats sip hasher performance-wise.</p>
+
+<p>On a side note: These numbers are quite impressive, and if you don&rsquo;t believe me <a href="https://gist.github.com/anonymous/3b0b489137af9006d5c498f10d42514a">you can run it yourself</a>. The reason that long hasher is able to outperform them both is that it consumes eight bytes at once. Otherwise, it is really just multiplying by a prime, adding some constant, multiplying by another byte, rotating right and then XORing by some key.</p>
+
+<p>Now, if it isn&rsquo;t quality, then what&rsquo;s the reason for using a cryptographic hash function? One reason often cited is Denial-of-Service resistance, and that&rsquo;s a valid concern, but is it really something that everyone should pay for?</p>
+
+<p>You may know the famous &ldquo;What you don&rsquo;t use, you don&rsquo;t pay for&rdquo; idiom. This is a core part of the &ldquo;abstraction without overhead&rdquo; principle. It is relatively rare to actually need DoS-protection, and you pay for this whenever you use <code>HashMap</code> without overwriting the hash function.</p>
+
+<p>And, ignoring that point for a moment, The idea that your code is &lsquo;secure by default&rsquo; is a dangerous one and promotes ignorance about security. You code is <em>not</em> secure by default.</p>
+
+<p>If you really do need a fast and yet secure hash function, Sip-hasher is a wonderful choice. To be clear, I&rsquo;m not arguing against Sip-hasher (I actually like the function), but rather against having it as a default choice.</p>
+
+<h2 id="btreemap"><code>BTreeMap</code></h2>
+
+<p><code>BTreeMap</code> and <code>BTreeSet</code> are generally a good implementation. My only criticism has to do with cache efficiency, which is relatively bad when compared to other implementations (Java, mainly). In fact, around 60% (<strong>update</strong>: Some have obtained other results, ranging from 10%-60%.) of the links followed leads to cache misses. For a map 1000 elements, a lookup would result in approximately 6 cache misses. For 10000, the number is 8.</p>
+
+<p>These can be quite expensive. A solution is proposed in the section about &ldquo;Cache-efficient structures&rdquo;.</p>
+
+<h2 id="vecdeque"><code>VecDeque</code></h2>
+
+<p><code>VecDeque</code> is a decent implementation. The only problem is that you cannot range index (slice) it. This is due to the very nature of ring buffers.</p>
+
+<p>An alternative to conventional ring buffers is <a href="http://www.codeproject.com/Articles/3479/The-Bip-Buffer-The-Circular-Buffer-with-a-Twist">biparite buffers</a>, which has essentially the same performance, but allows this (and other interesting) API.</p>
+
+<h2 id="mpsc">MPSC</h2>
+
+<p>MPSC is a popular tool for message passing, but a critical point is often overlooked: Every queuing/dequeueing involves a malloc call. That sounds pretty bad, doesn&rsquo;t it?</p>
+
+<p>MPSC is supposed to be lock-less, but that isn&rsquo;t the case if the tcache is empty. Then it involves a lock.</p>
+
+<p>Since you effectively queue and dequeue all of the time, you actually waste allocations going in and out the allocator. That&rsquo;s a major overhead, and totally unreflected in the API, giving an illusion of zero-cost.</p>
+
+<p>And, it turns out that it isn&rsquo;t necessary. Because of the ring-buffer-like structure of MPSC, you can effectively store it all in a concurrent SLOB list, making malloc calls incredibly rare (ideally only upon the first queue).</p>
+
+<p>My benchmarks I&rsquo;ve made on <a href="https://github.com/redox-os/ralloc">ralloc</a>, a memory allocator I wrote, (which uses mpsc internally for cross-thread frees) shows a significant performance gain. An exercise for the reader is to do the same for Servo and try to see if it affects performance.</p>
+
+<h2 id="vec"><code>Vec</code></h2>
+
+<p>My criticism of <code>Vec</code> is the lack of API for manual management. One particular missing thing is the ability to replace the reallocation strategy with a custom one.</p>
+
+<p>Vectors are used everywhere and they often have different usage patterns, many of which can be exploited to improve performance and memory efficiency.</p>
+
+<p>Another thing I sometimes need is the ability to get a mutable reference to the element I pushed without needing extra bound checks (note that in most cases this is a trivial optimization for LLVM, but it adds a lot of convenience). This could simply be solved by having <code>push</code> return <code>&amp;mut T</code>. This is technically a breaking change but I doubt it will affect anybody.</p>
+
+<h1 id="cache-efficient-structures">Cache-efficient structures</h1>
+
+<p>I spoke a little about SLOB-based arenas previously. It turns out to have major impact on the cache efficiency, and thereby the performance, of the structure.</p>
+
+<p>The idea is that each structure holds an arena which only spans a few memory pages, ensure data locality. Obviously, this is more memory hunky, but it is conceptually similar to vectors which reserve extra memory to avoid reallocation. In this case, we are looking for avoiding allocation instead.</p>
+
+<p>Depending on what you&rsquo;re doing it affects the performance positively by 3-10% (B-trees), 5-15% (linked lists), or 40-80% (mpsc). Those numbers are quite impressive (especially the last one).</p>
+
+<h1 id="replacing-the-allocator">Replacing the allocator</h1>
+
+<p>Another lacking feature is an <code>Allocator</code> trait, which is intended to be the bound of some generic parameter in all the collections, allowing you to replace the allocator to exploit allocation patterns of the structure.</p>
+
+<p>An RFC for exactly this <a href="https://github.com/rust-lang/rfcs/pull/1398">already exists</a> and is merged, but the implementation is incomplete.</p>
+
+<h1 id="hiding-box">Hiding <code>Box</code></h1>
+
+<p>An unfortunate thing is hiding the overhead by letting the function itself allocate, instead of letting the caller do it. This is (or at least, should be) considered bad style, because the API ought to reflect the semantics and performance characteristics. If the allocation is hidden to the programmer, she might not realize the expensive operations behind the scenes.</p>
+
+<h1 id="the-good-parts">The good parts</h1>
+
+<p>The implementations them self are really good and well-tested, and many of the points I made above are only relevant, when you are looking for very fine-grained performance. I have not criticized the API itself, because I think it does very well. Rust&rsquo;s collection API is one of the most well-designed I&rsquo;ve seen.</p>
+
+<p>It is also worth noting that the ecosystem contains lots of wonderful structures and implementations of these. Rust&rsquo;s ecosystem is getting more mature by every day, and to this day, it even contains very niche structures for very specific purposes, and that&rsquo;s really great since it means expansion of Rust&rsquo;s domain.</p>
+
+<h1 id="conclusion">Conclusion</h1>
+
+<p>Rust&rsquo;s &ldquo;collection of collections&rdquo; has quite a few short-fallings. Fortunately, Most of the problems described above are not inherent, and can be fixed. The first step through fixing a problem is diagnosing it, and I hope that this post is able to initiate some critical discussion around the implementation, API, and choice of collections for the standard library.</p>
+
+<p>There are already many different proposals floating around in the community, as well as implementations and so on. I hope we can look into lifting these or replacing them in libstd.</p>
+
+<p>The <a href="https://github.com/contain-rs">contain-rs</a> GitHub organization does a great job at providing a collection of various data structures, most of which are incredibly well-written. It would be interesting to see some of those in the standard library.</p>
+
+<h1 id="an-apology">An apology</h1>
+
+<p>The original title was exaggerated and inflammatory. To clarify, I don&rsquo;t think it is horrible, nor even bad, rather I&rsquo;d want a discussion/critical examination of the module and ways to improve it. I do realize that many people have spend a lot of time on implementing all these, and I admire it, calling it horrible (even if it is only in the title) is not fair, and it will likely distract the reader from the message of the post instead of inciting discussion. The mistake was entirely mine, and I should have given it a better title. Sorry.</p>
+
+  			</section>
+
+  			<footer class="post-footer">
+  				<div class="post-tags">
+            
+            
+                <a href="http://ticki.github.io//tags/rant/">rant</a>
+            
+                <a href="http://ticki.github.io//tags/rust/">rust</a>
+            
+                <a href="http://ticki.github.io//tags/critique/">critique</a>
+            
+                <a href="http://ticki.github.io//tags/data-structures/">data-structures</a>
+            
+            
+  				</div>
+  				<div class="post-share">
+  					<a class="icon-twitter" href="https://twitter.com/share?text=A%20Critique%20of%20Rust%27s%20%60std%3a%3acollections%60&url=http%3a%2f%2fticki.github.io%2fblog%2fa-critique-of-rusts-stdcollections%2f" onclick="window.open(this.href, 'twitter-share', 'width=550,height=235');return false;">
+  						<span>Twitter</span>
+  					</a>
+  					<a class="icon-facebook" href="https://www.facebook.com/sharer/sharer.php?u=http%3a%2f%2fticki.github.io%2fblog%2fa-critique-of-rusts-stdcollections%2f" onclick="window.open(this.href, 'facebook-share','width=580,height=296');return false;">
+  						<span>Facebook</span>
+  					</a>
+  					<a class="icon-gplus" href="https://plus.google.com/share?url=http%3a%2f%2fticki.github.io%2fblog%2fa-critique-of-rusts-stdcollections%2f" onclick="window.open(this.href, 'google-plus-share', 'width=490,height=530');return false;">
+  						<span>Google+</span>
+  					</a>
+  				</div>
+  			</footer>
+
+  			<aside class="post-comments">
+    
+    
+    <div id="disqus_thread"></div>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+    
+</aside>
+
+
+			</div>
+
+			<nav class="post-nav">
+				
+					<a class="post-nav-item post-nav-next" href="http://ticki.github.io/blog/fantastic/">
+						<section class="post-nav-teaser">
+							<span class="post-nav-icon"><i class="icon-arrow-left"></i></span>
+							<span class="post-nav-info">
+								<h4 class="post-nav-title">Why Rust&#39;s `std::collections` is absolutely fantastic</h4>
+								<p class="post-nav-excerpt">Now that we&#39;ve seen the bad stuff of `std::collections`, we&#39;re going to look into all the good stuff and various techniques used to optimize and improve the collections&hellip;</p>
+							</span>
+						</section>
+					</a>
+				
+				
+					<a class="post-nav-item post-nav-prev" href="http://ticki.github.io/blog/lambda-crabs-part-3-region-based-alias-analysis/">
+						<section class="post-nav-teaser">
+							<span class="post-nav-icon"><i class="icon-arrow-right"></i></span>
+							<span class="post-nav-info">
+								<h4 class="post-nav-title">Lambda crabs (part 3): Region-based alias analysis</h4>
+								<p class="post-nav-excerpt">In this post, we show how you can analyse alias properties through region data.&hellip;</p>
+							</span>
+						</section>
+					</a>
+				
+				<div class="clear"></div>
+			</nav>
+
+		</div>
+	</article>
+</main>
+
+				<div id="body-class" style="display: none;"></div>
+				<footer id="footer">
+					<section class="credits">
+						<span class="credits-theme">Theme <a href="https://github.com/zenithar/hugo-theme-bleak" target="_blank" rel="nofollow">Bleak</a> by <a href="http://zutrinken.com" target="_blank" rel="nofollow">zutrinken</a></span>
+						<span class="credits-software">Published with <a href="http://gohugo.io" target="_blank" rel="nofollow">Hugo</a></span>
+					</section>
+				</footer>
+				
+<div id="menu" data-target="menu">
+    <div class="menu-header">
+        <span class="menu-label">Menu</span>
+        <a class="menu-close" data-action="menu" data-target="menu"></a>
+    </div>
+
+    <div class="menu-list">
+        
+        
+        <li class="menu-list-item">
+            
+            <a class="home current js-ajax-link" href="/about/">About</a>
+        </li>
+        
+        
+        <li class="menu-list-item">
+            
+            <a class="home current js-ajax-link" href="https://github.com/ticki">GitHub</a>
+        </li>
+        
+    </div>
+
+</div>
+
+				
+<div id="tocMenu" data-target="toc">
+    <div class="menu-header">
+        <span class="menu-label">Menu</span>
+        <a class="menu-close" data-action="toc" data-target="toc"></a>
+    </div>
+    <div id="toc" class="menu-list">
+        <nav id="TableOfContents">
+<ul>
+<li><a href="#what-it-contains">What it contains</a></li>
+<li><a href="#what-it-doesn-t-contain">What it doesn&rsquo;t contain</a>
+<ul>
+<li><a href="#concurrent-data-structures">Concurrent data structures</a></li>
+<li><a href="#singly-linked-lists">Singly linked lists</a></li>
+<li><a href="#keyed-priority-queues">Keyed priority queues</a></li>
+<li><a href="#treaps">Treaps</a></li>
+<li><a href="#skip-lists">Skip lists</a></li>
+<li><a href="#self-balancing-trees">Self-balancing trees</a></li>
+<li><a href="#slobs-aka-pointer-lists-memory-pools-typed-arenas-etc">SLOBs (aka. pointer lists, memory pools, typed arenas, etc.)</a></li>
+</ul></li>
+<li><a href="#we-can-just-leave-it-to-other-libraries">&ldquo;We can just leave it to other libraries&rdquo;</a></li>
+<li><a href="#criticizing-the-structures-it-do-have">Criticizing the structures it do have</a>
+<ul>
+<li><a href="#hashmap"><code>HashMap</code></a>
+<ul>
+<li><a href="#robin-hood-hashing">Robin Hood hashing</a></li>
+<li><a href="#a-high-reallocation-threshold">A high reallocation threshold</a></li>
+<li><a href="#sip-hasher">Sip-hasher</a></li>
+</ul></li>
+<li><a href="#btreemap"><code>BTreeMap</code></a></li>
+<li><a href="#vecdeque"><code>VecDeque</code></a></li>
+<li><a href="#mpsc">MPSC</a></li>
+<li><a href="#vec"><code>Vec</code></a></li>
+</ul></li>
+<li><a href="#cache-efficient-structures">Cache-efficient structures</a></li>
+<li><a href="#replacing-the-allocator">Replacing the allocator</a></li>
+<li><a href="#hiding-box">Hiding <code>Box</code></a></li>
+<li><a href="#the-good-parts">The good parts</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+<li><a href="#an-apology">An apology</a></li>
+</ul>
+</nav>
+    </div>
+</div>
+
+
+				<div class="overlay"></div>
+			</div>
+		</section>
+
+    <script>
+      (function(c,f){asyncLoader=function(i,h){i.foreach(function(k,j){e(j,d(j),h)});if(typeof h.callback=="function"){var g=setInterval(function(){if(f.readyState==="complete"){clearInterval(g);h.callback()}},10)}};var d=function(g){var h=g.split(".");return h[h.length-1]},e=function(h,i,g){switch(i){case"js":a(h,g);break;case"css":b(h);break;default:break}},a=function(i,h){var g=document.createElement("script");g.type="text/javascript";g.async=true;g.src=i;document.getElementsByTagName("head")[0].appendChild(g)},b=function(g){var h=document.createElement("link");h.type="text/css";h.rel="stylesheet";h.href=g;document.getElementsByTagName("head")[0].appendChild(h)};Array.prototype.foreach=function(h){for(var g=0;g<this.length;g++){h(g,this[g])}}})(this,document);
+
+      asyncLoader([
+				"/js/dependencies.js",
+				"/css/dependencies.css"
+      ],{
+        callback:function(){
+					asyncLoader([
+						"/css/style.css",
+						"/js/script.js"
+					], {
+						callback: function() {
+							$('body').fadeIn( 800 );
+						}
+					});
+        }
+      });
+
+</script>
+
+
+
+</body>
+</html>
+
