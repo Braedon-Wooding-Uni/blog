@@ -95,7 +95,7 @@ As such, it is important to find a small, diverse set of subdiffusions which has
 
 ### Zero-sensitivity
 
-If your diffusion isn't zero-sensitive (i.e., $$f(x) = \{0, 1\}$$), you should ~~panic~~ come up with something better. In particular, make sure your diffusion contains at least one zero-sensitive subdiffusion as component.
+If your diffusion isn't zero-sensitive (i.e., $$f(0) = \{0, 1\}$$), you should ~~panic~~ come up with something better. In particular, make sure your diffusion contains at least one zero-sensitive subdiffusion as component.
 
 ### Avalanche diagrams
 
