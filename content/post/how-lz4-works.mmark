@@ -56,7 +56,7 @@ Any block starts with a 1 byte token, which is divided into two 4-bit fields.
 
 The first (highest) field in the token is used to define the literal. This obviously takes a value 0-15.
 
-Since we might want to encode higher integer, as such we make use of LSIC encoding: If the field is 15 (the meximal value), we read an integer with LSIC and add it to the original value (15) to obtain the literals length.
+Since we might want to encode higher integer, as such we make use of LSIC encoding: If the field is 15 (the maximal value), we read an integer with LSIC and add it to the original value (15) to obtain the literals length.
 
 Call the final value $$L$$.
 
