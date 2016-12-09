@@ -1,0 +1,114 @@
+---
+section: post
+date: 2016-12-08
+title: "SeaHash: Explained"
+description: "I explain how SeaHash works."
+comments: true
+featured: true
+image: /thumb/seahash-explained.png
+slug: seahash-explained
+tags:
+    - hashing
+    - computer-science
+    - algorithms
+---
+
+<script type="text/javascript"
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+So, not so long ago, I designed [SeaHash](https://github.com/ticki/tfs/tree/master/seahash), an alternative hash algorithm with performance better than most (all?) of the existing non-cryptographic hash functions available. I designed it for checksumming for a file system, I'm working on, but I quickly found out it was sufficient for general hashing.
+
+It blew up. I got a lot of cool feedback, and yesterday it was picked as [crate of the week](https://this-week-in-rust.org/blog/2016/12/06/this-week-in-rust-159/). It shows that there is some interest in it, so I want to explain the ideas behind it.
+
+# Hashing: an introduction
+
+The basic idea of hashing is to map data with patterns in it to pseudorandom values. It should be designed such that only few collisions happen.
+
+Simply put, the hash function should behave like a pseudorandom function (PRF) producing a seemingly random stream from a non-random stream. It is similar to pseudorandom functions, in a sense, with difference that they must take variable input.
+
+Formally, perfect PRFs are defined as follows:
+
+>$$f : \{0, 1\}^n \to \{0, 1\}^n$$ is a perfect PRF if and only if given a distribution $$d : \{0, 1\}^n \to \left[0,1\right]$$, $$f$$ maps inputs following the distribution $$d$$ to the uniform distribution.
+
+# Constructing a hash function from a PRF
+
+There are various ways to construct a variable-length hash function from a PRF. The most famous one is Merkle–Damgård construction. We will focus on this.
+
+There are multiple ways to do Merkle–Damgård construction. The most famous one is the wide-pipe construction. It works by having a state, which combined with one block of the input data at a time. The final state will then be the hash value. This combining function is called a "compression function". It takes two blocks of same length and maps it to one: $$f : \{0, 1\}^n \times \{0, 1\}^n \to \{0, 1\}^n$$.
+
+$$h = f(f(f(\ldots, b_0), b_1), b_2)$$
+
+It is important that this compression emits pseudorandom behavior, and that's where PRFs comes in. For general-purpose hash function where we don't care about security, the construction usually looks like this:
+
+$$f(a, b) = p(a \oplus b)$$
+
+This of course is commutative, but that doesn't matter, because we don't need non-commutativity in the Merkle–Damgård construction.
+
+# Choosing a PRF
+
+The [PCG family of PRFs](http://www.pcg-random.org/) is my favorite PRF I've seen so far:
+
+$$\begin{align*}
+x &\gets p \otimes x \\
+x &\gets x \oplus ((x \gg 32) \gg (x \gg 60)) \\
+x &\gets p \otimes x
+\end{align*}$$
+
+($$\otimes$$ means modular multiplication)
+
+The PCG paper goes into depth on why this. In particular, it is a quite uncommon to use these kinds of non-fixed shifts.
+
+This is a bijective function, which means that we can't ever have less entropy than the input, which is a good property to have in a hash function.
+
+# Parallelism
+
+This construction of course relies on dependencies between the states, rendering it impossible to parallelize.
+
+We need a way to be able to independently calculate multiple block updates. With a single state, this is simply not possible, but fear not, we can add multiple states.
+
+Instruction-level parallelism means that we don't even need to fire up multiple threads (which would be quite expensive), but simply exploit CPU's instruction pipelines.
+
+![A diagram of the new design.](/img/seahash_state_update_diagram.svg)
+
+In the above diagram, you can see a 4-state design, where every state except the first is shifted down. The first state ($$a$$) gets the last one ($$d$$) after being combined with the input block ($$D$$) through our PRF:
+
+$$\begin{align*}
+a' &= b \\
+b' &= c \\
+c' &= d \\
+d' &= f(a \oplus D) \\
+\end{align*}$$
+
+It isn't obvious how this design allows parallelism, but it has to do with the fact that you can unroll the loop, such that the shifts aren't needed. In particular, after 4 rounds, everything is back at where it started:
+
+$$\begin{align*}
+a &\gets f(a \oplus B_1) \\
+b &\gets f(b \oplus B_2) \\
+c &\gets f(c \oplus B_3) \\
+d &\gets f(d \oplus B_4) \\
+\end{align*}$$
+
+If we take 4 rounds every iteration, we get 4 independent state updates, which are run in parallel.
+
+This is also called an _alternating 4-state Merkle–Damgård construction_.
+
+## Finalizing the four states
+
+Naively, we would just XOR the four states (which have difference initialization vectors, and hence would not commute).
+
+There are some issues: What if the input doesn't divide our 4 blocks? Well, the simple solution is of course padding, but that gives us another issue: how do we distinguish between padding and normal zeros?
+
+We XOR the length with the hash value. Unfortunately, this is obviously not discrete, since appending another zero would then only affect the value slightly, so we need to run it through our PRF:
+
+![SeaHash finalization](/img/seahash_finalization_diagram.svg)
+
+# Putting it all together
+
+We can finally put it all together:
+
+[![SeaHash construction](/img/seahash_construction_diagram.svg)](/img/seahash_construction_diagram.svg)
+
+(click to zoom)
+
+You can see the code and benchmarks [here](https://github.com/ticki/tfs/tree/master/seahash).

@@ -1,0 +1,123 @@
+---
+section: post
+date: 2016-11-11
+title: "Ternary as a prediction residue code"
+description: "I present a new low-byte code based on base 3."
+comments: true
+featured: false
+slug: ternary-as-a-prediction-residue-code
+tags:
+    - coding-theory
+    - compression
+---
+
+<script type="text/javascript"
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+If we look at how most lossless image compression formats works, they don't use deduplication compression (like LZ-class algorithms), because that's simply far from the nature of images. The same goes for audio and video. Instead, you have two maps:
+
+1. The approximative map ($$a(\vec{v})$$): This should give a rough outline of the medium, that is, it is should predict predict the medium based on a small sequence of bytes (defined by the encoding). This could be a polynomial, linear map, bilinear map, Bézier curve, Fourier decomposition, or any class of functions which can be represented compactly.
+
+2. The prediction residue ($$p(\vec{v})$$): This map "corrects" $$a(\vec{v})$$ such that the combination of the two maps gives an exact result.
+
+<sup>Note that this is massively simplified, and a lot of additional steps are done in popular media compression algorithms.</sup>
+
+The final function is then defined as
+
+$$f(\vec{v}) = a(\vec{v}) + k p(\vec{v})$$
+
+The question just remains: how can we efficiently represent the prediction residue? Well, we know a crucial thing. $$p(\vec{v})$$ tends to be small, because much of it is accounted for in $$a(\vec{v})$$, so here's where coding theory comes in.
+
+In fact, we can reconsider the problem in terms of coding:
+
+> Create a prefix code such that lower bytes have smaller representation than higher bytes.
+
+It is then natural to ask:
+
+# Why not just stick with a Huffman tree?
+
+Well, we could, but because we often need live encoding and decoding, we need something faster. Huffman trees are slow because they involve cache misses and forward scans.
+
+The gain of using Huffman trees in this case is really small, because the basic distribution is known in advance.
+
+We want a code defined by a small set of rules which can be encoded and decoded with extreme performance, so we want to avoid Huffman codes for these reasons.
+
+# Candidate: Rice coding
+
+Rice coding is a special case of Golomb coding. It is often used in Audio codecs, where it works fine.
+
+Here's how it works:
+
+F> To encode a byte $$b$$, do the following:
+F> 1. Write $$b \ll n$$ 1 bits.
+F> 2. Write a 0 bit.
+F> 3. Write $$b % n$$ in base two ($$b$$ bits).
+
+But it has multiple shortfalls:
+
+1. Often there is no fitting constants, because of the trade-off. You need to choose between low minimum and high maximum or high minimum and low maximum. There's little middle-ground.
+2. It is slow to encode and decode, because reading new bits requires you to branch to see if a new byte is needed (in particular, the atomic units are not aligned with the byte).
+3. It encodes arbitrarily high numbers, meaning that some redundancy exists when coding bytes-only.
+
+It is used in certain MPEG variants as well as FLAC and lossless JPEG.
+
+# An alternative approach: Base 3 in base 4.
+
+So, what if we encode everything in base 3?
+
+First of all, why would we do that?
+
+Well, for it to be a prefix code, you need a way to determine if the token is over, i.e. a terminator, so you really need 4 different symbols (0, 1, 2, T). Enumerating these symbols is trivial to do in binary: It's just two bits!
+
+This means that we positively know that every byte contains exactly 4 symbols, greatly improving decoding/encoding performance.
+
+# Eliminating redundancy
+
+There is a redundancy in this system, though. It is not a bijection. `01T` and `1T` gives the same (1), but a simple trick can eliminate this.
+
+In particular, we can say that if the two first bits in the token are 0 (which is redundant), the final value produced is 0, but then `00T` would be equivalent to `0`. Fortunately, this redundancy can easily be solved by adding 1 to the decoded result, and hence making 0 impossible unless the first symbol is `0`.
+
+## Overflows
+
+Since we cannot encode above 255, there is a class of trap values, where it overflows. Fortunately, there is a nice solution to it: just skip the terminator and go to the next token.
+
+# Table
+
+| N   | Ternary representation  | Binary representation   | Reduction (of original size)
+|-----|------------------------:|------------------------:|----------------------------:
+| 0   |    `0`                  |       `00`              | 25%
+| 1   |    `T`                  |       `11`              | 25%
+| 2   |   `1T`                  |     `0111`              | 50%
+| 3   |   `2T`                  |     `1011`              | 50%
+| 4   |  `10T`                  |   `010011`              | 75%
+| 5   |  `11T`                  |   `010111`              | 75%
+| 6   |  `12T`                  |   `011011`              | 75%
+| 7   |  `20T`                  |   `100011`              | 75%
+| 8   |  `21T`                  |   `100111`              | 75%
+| 9   |  `22T`                  |   `101011`              | 75%
+| 10  | `100T`                  | `10000011`              | 100%
+| ... | ...                     | ...                     | ...
+| 255 | `100110`                | `010000010100`          | 150%
+
+As you may notice, ten is the splitting point where it goes from less than 100% to 100%, which means that if there is a significant number of bytes above or equals to 10, it expands.
+
+# Moving the tipping point
+
+10 is a bit too low for many purposes, so it is natural to ask if we can modify the code to expand it. In fact, a technique similar to Rice coding can be used: Encode the $$k$$ last bits seperately than the first ones.
+
+In particular, we split the byte into two and then encode the first part through the described technique, and the second part through usual little-endian encoding.
+
+Put $$k=2$$, and the tipping point moved to 40. $$k=4$$, and the tipping point is 160.
+
+# Usecases
+
+Well, really, it depends on the nature of the data you compress. The best way to find out if it fits is to experiment with it.
+
+Rice code tends to be better if a lot of the bytes are low and outliers are relatively rare, but when there are outliers, it tends to hurt in terms of efficiency.
+
+# Conclusion
+
+Assuming you approximative function is precise enough, this type coding would give a fairly good ratio. If it is imprecise or doesn't follow the right distribution, you might end up expanding the size.
+
+In the end, it depends on what you're compressing, and you should consider all the various possiblities. Often Rice coding is fitting, but sometimes more complex codes (like the one presented here) are needed.

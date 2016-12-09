@@ -42,7 +42,7 @@ This is really were the compression is going on. Copying from the old stream all
 
 A block looks like:
 
-$$\overbrace{\underbrace{t_1}_\text{4 bits}\  \underbrace{t_2}_\text{4 bits}}^\text{Token} \quad \underbrace{\overbrace{e_1}^\texttt{LISC}}_\text{If $t_1 = 15$} \quad \underbrace{\overbrace{L}^\text{Literal}}_{t_1 + e\text{ bytes }} \quad \overbrace{\underbrace{O}_\text{2 bytes}}^\text{Little endian} \quad \underbrace{\overbrace{e_2}^\texttt{LISC}}_\text{If $t_2 = 15$}$$
+$$\overbrace{\underbrace{t_1}_\text{4 bits}\  \underbrace{t_2}_\text{4 bits}}^\text{Token} \quad \underbrace{\overbrace{e_1}^\texttt{LISC}}_\text{If $t_1 = 15$} \quad \underbrace{\overbrace{L}^\text{Literal}}_{t_1 + e_1\text{ bytes }} \quad \overbrace{\underbrace{O}_\text{2 bytes}}^\text{Little endian} \quad \underbrace{\overbrace{e_2}^\texttt{LISC}}_\text{If $t_2 = 15$}$$
 
 And decodes to the $$L$$ segment, followed by a $$t_2 + e_2 + 4$$ bytes sequence copied from position $$l - O$$ from the output buffer (where $$l$$ is the length of the output buffer).
 
