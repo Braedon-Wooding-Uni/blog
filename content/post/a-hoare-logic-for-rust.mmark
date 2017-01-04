@@ -373,7 +373,7 @@ We denote pointer writes by $$p \stackrel{\text{ptr}}{\gets} x$$.
 
 The first feature of separation logic is the notion of "separate conjunction", denotes $$P * Q$$.
 
-This asserts that $$P$$ and $$Q$$ are both true and independent, i.e. their "heaps" are disjointed and not affected by the statement of the Hoare triple. In particular, let $$A$$ be the domain of $$\mathcal{H}$$, then let $$\{A_1, A_2\}$$ be some semipartition of $$A$$ ($$A_1 \cap A_2 = \emptyset$$), then put $$A_1 = \textbf{ref}(P)$$ and $$A_b = \textbf{ref}(Q)$$ ($$\textbf{ref}(P)$$ denotes all the locations that are referenced in $$P$$, e.g. $$\textbf{ref}([\mathcal{H}(x) = 3]) = \{x\}$$)
+This asserts that $$P$$ and $$Q$$ are both true and independent, i.e. their "heaps" are disjointed and not affected by the statement of the Hoare triple. In particular, let $$A$$ be the domain of $$\mathcal{H}$$, then let $$\{A_1, A_2\}$$ be some semipartition of $$A$$ ($$A_1 \cap A_2 = \emptyset$$), then put $$A_1 = \textbf{ref}(P)$$ and $$A_2 = \textbf{ref}(Q)$$ ($$\textbf{ref}(P)$$ denotes all the locations that are referenced in $$P$$, e.g. $$\textbf{ref}([\mathcal{H}(x) = 3]) = \{x\}$$)
 
 We can then put $$P * Q$$. This might seem useless at first (how much different from $$\land$$ is it?), but it is incredibly important: If $$P$$ and $$Q$$ are dependent, not by sharing a free variable, but instead share a variable through aliasing (say $$P$$ has $$x$$ free and $$Q$$ has $$y$$ free, and $$x \sim y$$).
 
