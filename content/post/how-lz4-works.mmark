@@ -30,7 +30,7 @@ It is a form of addition code, in which we read a byte. If this byte is the maxi
 
 In short, we just keep adding bytes and stop when we hit a non-0xFF byte.
 
-We'll use the name "LSIC" for convinience.
+We'll use the name "LSIC" for convenience.
 
 # Block
 
